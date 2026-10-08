@@ -1,5 +1,5 @@
 ---
-description: Log the session in PROGRESS.md, tick PLAN.md, record decisions, commit, and say what comes next
+description: Log the session in PROGRESS.md, tick PLAN.md, record decisions, commit, push, and say what comes next
 ---
 
 Wrap up this session of agent-office-3d.
@@ -15,7 +15,11 @@ Wrap up this session of agent-office-3d.
 5. Run `npm test` if tests exist. Report failures honestly; do not commit broken tests silently.
 6. `git status`, then stage the relevant files and commit with a short English message
    (`stage N: ...`). Never commit `node_modules/`, local config, or stats files.
-7. Tell the user, in Turkish, in a few lines: what was committed and exactly what the next session
-   will do (they will type `/next`).
+7. Push to GitHub (public repo, user approved 2026-10-09): `git push origin main`.
+   Before pushing, check that every new commit uses the no-reply email
+   (`git log origin/main..HEAD --format=%ae` must only show `...@users.noreply.github.com`) and
+   that tests pass. Never force-push. If the push fails, say so and leave the commits local.
+8. Tell the user, in Turkish, in a few lines: what was committed and pushed, and exactly what the
+   next session will do (they will type `/next`).
 
 $ARGUMENTS
