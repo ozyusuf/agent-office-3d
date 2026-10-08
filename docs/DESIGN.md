@@ -95,7 +95,7 @@ Must also work down to 420 px wide. Nothing scrolls; the log scrolls inside itse
   for permission, red on error.
 - **Station labels**: small glass pills with thin cyan border floating above each station
   (screen-projected each frame, `web/labels.js`). Active station's label brightens. Always shown:
-  Code Smelter, Vision & Task Board, Test Centrifuge; shown only while active: Orbit Sphere, Server
+  Code Smelter, Vision & Task Board, Terminal; shown only while active: Orbit Sphere, Server
   Racks, Portal Ring, Arcade; never: desk (the character label is there) and data falls
   (`web/stations.js`). Labels shrink with the scene in small windows (down to 70 %) and step aside
   the shortest way when they would overlap (character label first, then active stations).
@@ -117,7 +117,7 @@ Must also work down to 420 px wide. Nothing scrolls; the log scrolls inside itse
 | desk | Command Desk | Komuta Masası |
 | smelter | Code Smelter | Kod Ocağı |
 | board | Vision & Task Board | Görüş ve Görev Panosu |
-| centrifuge | Test Centrifuge | Test Laboratuvarı |
+| centrifuge | Terminal | Terminal |
 | orbit | Orbit Sphere | Yörünge Küresi |
 | racks | Server Racks | Sunucu Kabinleri |
 | falls | Data Falls | Veri Şelaleleri |
@@ -135,7 +135,7 @@ Placement as seen in the reference (screen positions inside the realm view):
 | Command desk + character | centre | round dais with cyan rings; ring console open towards the camera (a closed front hid the character), holo keyboard in the opening; character stands inside | everything |
 | Code Smelter | left of centre, slightly lower | boxy furnace, orange fire core, sparks | Edit, Write, NotebookEdit |
 | Vision & Task Board | right/behind character | large curved holo screen (blue, cyan code lines) | Read, Grep, Glob, todo/task tools |
-| Test Centrifuge | bottom right | 3 nested gimbal rings (magenta, cyan, yellow) on a base | Bash, PowerShell |
+| Terminal (key `centrifuge`) | bottom right | 3 nested gimbal rings (magenta, cyan, yellow) on a base | every Bash, PowerShell call |
 | Orbit Sphere | top right | blue glowing planet with 2 tilted rings, on a pipe pedestal | WebSearch, WebFetch |
 | Server racks | top left, behind | 3 tall cabinets with LED rows | context fill |
 | Data falls | bottom left + right edge | cyan particle/texture waterfalls from pipes into basins | activity rate |
@@ -171,7 +171,7 @@ Every reaction is caused by a real event. "Pair" = matched by `tool_use_id`.
 | PreToolUse | Read | character to Board; file name scrolls on screen | Read glows; label "Reading (file)" |
 | PreToolUse | Grep, Glob | character to Board; pattern scrolls | Grep glows; label "Searching (pattern)" |
 | PreToolUse | Edit, Write, NotebookEdit | character to Smelter; flame grows | Edit glows; label "Editing (file)" |
-| PreToolUse | Bash, PowerShell | Centrifuge rings speed up | Bash glows; label "Running command" |
+| PreToolUse | Bash, PowerShell | Terminal rings speed up | Bash glows; label "Running command" |
 | PreToolUse | WebSearch, WebFetch | Orbit Sphere spins faster, rings brighten | Web glows; label "Searching the web (host)" |
 | PreToolUse | TodoWrite, Task* tools | Board shows task count | label "Planning tasks" |
 | PreToolUse | anything else (MCP, Skill, ...) | desk hologram pulses | log only |

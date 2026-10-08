@@ -170,3 +170,8 @@ falls, rings, dust) carry no meaning until stage 4 ties them to events.
 **D34. Turkish station names (user, 2026-10-09):** smelter = "Kod Ocağı" ("Kod Ergitme" was
 unclear), centrifuge = "Test Laboratuvarı" ("Test Sınama" repeats itself; the user wants a
 test-related name, "Komut Çarkı" was rejected). English names unchanged.
+
+**D35. The rings station is called "Terminal" in both languages (user, 2026-10-09).** It reacts to
+every Bash/PowerShell call (npm, git, tests, ...), not only to tests, so the name stays general.
+Replaces the centrifuge names in D34 ("Test Laboratuvarı") and "Test Centrifuge"; the internal key
+stays `centrifuge`. Test commands are not routed to a separate station.

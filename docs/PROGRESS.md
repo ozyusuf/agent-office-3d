@@ -24,7 +24,8 @@
   when they overlap (D27, D28). Gear menu: bloom on/off, pixel ratio 1/1.5/2, measured fps + draw
   calls. Config keys `bloom`, `pixelRatioCap` (+ tests). Station label test. 39 tests pass.
 - User feedback applied: overlapping labels in a ~700x765 window (scaling + collision + bigger
-  scene in short windows, D28/D29); Turkish names "Kod Ocağı" and "Test Laboratuvarı" (D34).
+  scene in short windows, D28/D29); Turkish name "Kod Ocağı" (D34); the rings station is now
+  "Terminal" in both languages and stays the station for every Bash/PowerShell call (D35).
 - Checks (scratch server on port 7861 + scratch config/data; test events only there): screenshots at
   420x900, 520x960, 600x1000, 702x765 @1.5x, 960x1040, 1280x720; working / compacting / helper /
   web states show the right labels; no-WebGL fallback (`--disable-webgl`); draw calls counted by
@@ -35,9 +36,6 @@
 **Left:** stages 4-6.
 
 **Known issues / open questions**
-- Stage 4 decision: the Test Laboratuvarı lights up for every Bash/PowerShell call (DESIGN.md); the
-  user expects it for tests. Option offered: only test commands (`npm test`, `pytest`, ...) go there,
-  other commands go to the desk. Ask/decide at the start of stage 4.
 - fps numbers come from headless Edge, not a real window; a check in the user's real browser is
   still worth doing (gear menu shows fps).
 - Labels step aside greedily each frame; once the character moves (stage 4) they may jump between
@@ -46,8 +44,7 @@
 - `prefers-reduced-motion` is not applied to the 3D ambient loops yet.
 - First load logs a harmless D3D shader compiler warning (X4122) from ANGLE.
 
-**Next step:** `/next` -> Stage 4. First tasks: settle the Test Laboratuvarı question, then a
-client-side scene state fed by the server snapshot, character walking/turning between stations,
+**Next step:** `/next` -> Stage 4. First tasks: a client-side scene state fed by the server snapshot, character walking/turning between stations,
 and the event -> reaction table rows one by one (rack LEDs from context fill, falls speed from
 activity rate).
 

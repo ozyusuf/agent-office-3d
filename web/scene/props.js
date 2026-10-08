@@ -374,7 +374,7 @@ function visionBoard() {
   return { group, anchor: localPoint(group, 1.1, yMid + H / 2 + 0.2, 0.2) };
 }
 
-// ---- Test Centrifuge: three nested gimbal rings on a base ----
+// ---- Terminal (key "centrifuge"): three nested gimbal rings on a base, spins for shell commands ----
 
 function centrifuge() {
   const p = PLATFORMS.east;
