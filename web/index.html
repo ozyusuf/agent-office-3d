@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent Office · Events</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="bar">
+    <div class="title">
+      <strong>agent-office-3d</strong>
+      <span class="sub">raw hook event stream</span>
+    </div>
+    <div class="status">
+      <span id="count" class="count">0 events</span>
+      <span id="conn" class="conn" data-state="connecting">connecting…</span>
+      <button id="clear" type="button" title="Clear the list in this window only">Clear</button>
+    </div>
+  </header>
+  <main>
+    <p id="empty" class="empty">Waiting for hook events. Use Claude Code in a project that has the hooks installed.</p>
+    <ol id="list" class="list" reversed></ol>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
