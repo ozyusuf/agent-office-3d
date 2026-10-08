@@ -7,16 +7,31 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { normalize } from './normalize.js';
+import { loadConfig } from './config.js';
+import { HudState } from './state.js';
+import { loadStats, createStatsWriter } from './stats.js';
+
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
+const WEB_DIR = path.join(ROOT, 'web');
+// Env overrides let tests run a second server without touching the user's config or stats.
+const CONFIG_FILE = path.resolve(ROOT, process.env.AGENT_OFFICE_CONFIG || 'config.json');
+const DATA_DIR = path.resolve(ROOT, process.env.AGENT_OFFICE_DATA || 'data');
+const { version } = JSON.parse(await fs.readFile(path.join(ROOT, 'package.json'), 'utf8'));
+
+const { config, warnings } = loadConfig(CONFIG_FILE);
+for (const warning of warnings) console.warn(`Warning: ${warning}`);
 
 const HOST = '127.0.0.1';
-const PORT = Number(process.env.AGENT_OFFICE_PORT) || 7847;
+const PORT = config.port;
 const REORDER_MS = 350; // how long an event waits for earlier-fired hooks (D3)
 const HISTORY_SIZE = 200; // recent events replayed to a browser when it connects
 const MAX_BODY = 16 * 1024 * 1024; // hook input can include large tool output
 
-const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const WEB_DIR = path.join(ROOT, 'web');
-const { version } = JSON.parse(await fs.readFile(path.join(ROOT, 'package.json'), 'utf8'));
+const statsFile = path.join(DATA_DIR, 'stats.json');
+const loaded = loadStats(statsFile);
+if (loaded.warning) console.warn(`Warning: ${loaded.warning}`);
+const hud = new HudState({ xp: loaded.xp });
+const statsWriter = createStatsWriter(statsFile);
 
 const allowedHosts = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
 const allowedOrigins = new Set([...allowedHosts].map((h) => `http://${h}`));
@@ -62,7 +77,8 @@ function publish(event) {
   event.id = nextId++;
   history.push(event);
   if (history.length > HISTORY_SIZE) history.shift();
-  const message = JSON.stringify({ type: 'event', event });
+  if (hud.apply(event)) statsWriter.save(hud.xp);
+  const message = JSON.stringify({ type: 'event', event, state: hud.snapshot() });
   for (const client of wss.clients) if (client.readyState === client.OPEN) client.send(message);
   logEvent(event);
 }
@@ -127,15 +143,20 @@ function sendText(res, status, text) {
   res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' }).end(text);
 }
 
+function sendJson(res, data) {
+  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+  res.end(JSON.stringify(data));
+}
+
 const server = http.createServer((req, res) => {
   // Host check blocks DNS-rebinding pages from talking to us (D6).
   if (!allowedHosts.has(req.headers.host)) return sendText(res, 403, 'Forbidden host');
   const { pathname } = new URL(req.url, 'http://local');
   if (req.method === 'POST' && pathname === '/event') return handleEvent(req, res);
   if (req.method === 'GET' && pathname === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ ok: true, version, clients: wss.clients.size, events: nextId - 1 }));
+    return sendJson(res, { ok: true, version, clients: wss.clients.size, events: nextId - 1 });
   }
+  if (req.method === 'GET' && pathname === '/state') return sendJson(res, { config, state: hud.snapshot() });
   if (req.method === 'GET') return serveStatic(pathname, res);
   sendText(res, 405, 'Method not allowed');
 });
@@ -155,7 +176,7 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 wss.on('connection', (ws) => {
-  ws.send(JSON.stringify({ type: 'hello', version, history }));
+  ws.send(JSON.stringify({ type: 'hello', version, config, history, state: hud.snapshot() }));
 });
 
 // ---- Start / stop ----
@@ -173,8 +194,9 @@ server.listen(PORT, HOST, () => {
   console.log(`agent-office-3d ${version} listening on http://${HOST}:${PORT}`);
 });
 
-for (const signal of ['SIGINT', 'SIGTERM']) {
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
   process.on(signal, () => {
+    statsWriter.flush();
     for (const client of wss.clients) client.close(1001, 'server shutting down');
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 500).unref();

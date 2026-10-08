@@ -10,9 +10,12 @@ a "how it was built" guide will be written at the end.
 Claude Code hooks -> local server (127.0.0.1 only) -> WebSocket -> three.js page.
 - `hooks/send-event.ps1` - PowerShell hook script. Forwards the raw hook JSON (stdin) to `POST /event`.
 - `server/index.js` - Node HTTP + `ws` server: receives events, reorders by hook start time,
-  keeps recent history, broadcasts to browsers, serves `web/`.
-- `server/normalize.js` - turns raw hook JSON into a small display event (no file contents).
-- `web/` - browser page. Plain ES modules, no build step, no framework.
+  keeps recent history, broadcasts event + state snapshot, serves `web/`, `GET /state`.
+- `server/normalize.js` - raw hook JSON -> small display event. `server/state.js` - session state
+  machine + level curve (the HUD only renders it). `server/config.js`, `server/stats.js` - config.json, XP file.
+- `web/` - plain ES modules, no build step: `index.html` HUD (`app.js`, `hud.css`, `theme.css`,
+  `i18n.js`, `narrate.js`, `stations.js`), `debug.html` raw event list.
+- Local files (gitignored): `config.json` (see `config.example.json`), `data/stats.json` (XP).
 
 ## Hard rules
 - Hooks are `type: "command"`, run by Windows PowerShell 5.1 (`powershell.exe`) with `"async": true`.
@@ -38,9 +41,11 @@ Claude Code hooks -> local server (127.0.0.1 only) -> WebSocket -> three.js page
 ## Commands
 ```
 npm install          # once
-npm start            # server on http://127.0.0.1:7847 (env AGENT_OFFICE_PORT to change)
+npm start            # server on http://127.0.0.1:7847 (port: env AGENT_OFFICE_PORT > config.json)
 npm test             # node:test unit tests
 ```
+Test server that never touches the user's data: set `AGENT_OFFICE_PORT`, `AGENT_OFFICE_CONFIG`,
+`AGENT_OFFICE_DATA` to scratch values. Never send test events to the server the user watches.
 Test the hook by hand (PowerShell):
 `'{"hook_event_name":"Stop","session_id":"t"}' | powershell -NoProfile -ExecutionPolicy Bypass -File hooks/send-event.ps1`
 

@@ -66,3 +66,50 @@ A failed or interrupted tool call fires `PostToolUseFailure` instead of `PostToo
 Bash call that exited with code 2 never got a PostToolUse). Without it a station could stay "active"
 forever. Kept fields: one-line `error`, `tool_error.type` as `errorType`, `is_interrupt` as
 `interrupted`, `duration_ms`. Failed calls count towards context fill and XP like successful ones.
+
+## 2026-10-09 - Stage 2
+
+**D14. Settings = optional `config.json` (gitignored) + defaults in code (`server/config.js`).**
+Every key is validated; a bad value falls back to its default with a console warning instead of
+crashing. Port order is env `AGENT_OFFICE_PORT` > config.json > 7847, in both the server and the hook.
+The hook finds the port with a regex on config.json (no `ConvertFrom-Json`, stays fast; D4).
+Env `AGENT_OFFICE_CONFIG` / `AGENT_OFFICE_DATA` let tests run a second server with scratch files,
+so test events never reach the server the user is watching.
+
+**D15. The session state lives on the server (`server/state.js`); browsers only render it.**
+The snapshot goes out with `hello` and with every `event`, and `GET /state` returns it for checks.
+One source of truth, unit-testable without a browser, and stage 3/4 reuse the same state.
+The focus session is the one with the most recent event (DESIGN.md).
+
+**D16. Unknown is shown as unknown.** If the server joins a session late (no SessionStart seen, or
+resume/fork), time and context are flagged as lower bounds and shown with "≥". A missing effort level
+shows "–". Before the first event the panels say "waiting for events" and draw no bars.
+
+**D17. Context fill counts only the main agent's finished tool calls; XP counts all of them.**
+Subagents work in their own context window, so their calls do not fill the main one, but they are
+still work done.
+
+**D18. Permission pairing.** PermissionRequest has no `tool_use_id` (hooks docs), so it is paired with
+the latest running call of the same tool and cleared by that call's PostToolUse/Failure, the next
+PreToolUse, a new prompt, Stop/StopFailure or SessionEnd. If it arrives before its own PreToolUse
+it is paired, not cleared. An interrupted tool (`is_interrupt`) ends the turn, because Stop does not
+fire on a user interrupt (hooks docs).
+
+**D19. PostToolUse adds no Hook Flow line** (the skill dims instead), so the log reads as one
+sentence per action. Failures, interrupts and every other event do get a line. Calls made inside a
+subagent are marked "↳"; with more than one session in the log every line gets a 4-character
+session tag.
+
+**D20. Stage 2 language switch = small gear menu, per tab only.** The saved default comes from
+config.json; `?lang=en|tr` also works in the URL. Writing settings from the browser is stage 5.
+
+**D21. Only three station labels in stage 2** (Code Smelter, Vision & Task Board, Test Centrifuge,
+as in the reference) at fixed positions; the other stations have hidden label slots. Stage 3 decides
+which labels to show once they are projected from the 3D stations.
+
+**D22. HUD details that differ from the first DESIGN.md draft:** Grep's dot is green (as in the
+reference image, not purple-blue); Turkish skill labels are words (Oku, Ara, Düzenle, Komut, Web,
+İzin); the stats meters are stacked (label + value, bar below) because the top-left column is only
+~175 px wide at 600 px; an empty realm title means a translated default ("Siber Diyar" /
+"Cyber-Realm"); the level ring is decoration, the XP bar under the name is the data.
+System fonts only for now (Bahnschrift, Consolas), so nothing is downloaded.

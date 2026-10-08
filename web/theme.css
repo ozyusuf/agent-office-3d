@@ -1,0 +1,43 @@
+/* Palette and shared tokens from docs/DESIGN.md section 2. The 3D code mirrors these in palette.js
+   (stage 3). Stage 5's accent colour replaces --neon-cyan; derived tokens follow it via color-mix. */
+:root {
+  color-scheme: dark;
+
+  /* measured from docs/design/reference.png unless marked derived */
+  --bg-void: #040414;
+  --bg-deep: #040c1c;
+  --bg-navy: #081828;
+  --surface: #0e213b;
+  --surface-violet: #1b1b37;
+  --metal: #3c3c3c;
+  --neon-cyan: #33b7de;
+  --neon-cyan-soft: #4fc3e4;
+  --neon-blue: #2c78b9;
+  --neon-purple: #724bb6;
+  --neon-magenta: #e350a4;
+  --fire-orange: #f1ad56;
+  --fire-deep: #e0662a; /* derived */
+  --warn-yellow: #f4c752;
+  --ok-green: #56d999;
+  --alert-red: #ff3b5c; /* derived */
+  --text: #e6f6ff; /* derived */
+  --text-dim: #8aa4c0; /* derived */
+
+  /* HUD glass */
+  --glass-fill: rgb(14 33 59 / 0.72);
+  --glass-border: color-mix(in srgb, var(--neon-cyan) 60%, transparent);
+  --glass-glow: 0 0 12px color-mix(in srgb, var(--neon-cyan) 35%, transparent);
+  --radius: 5px;
+
+  /* Skill colours (skill bar) */
+  --skill-read: color-mix(in srgb, var(--neon-purple) 55%, var(--neon-cyan-soft));
+  --skill-search: var(--ok-green);
+  --skill-edit: var(--fire-orange);
+  --skill-shell: var(--warn-yellow);
+  --skill-web: var(--neon-cyan-soft);
+  --skill-permission: var(--warn-yellow);
+
+  /* Fonts: system fonts with Turkish glyphs; no downloads */
+  --font-ui: Bahnschrift, "Segoe UI", system-ui, sans-serif;
+  --font-mono: Consolas, "Cascadia Mono", ui-monospace, monospace;
+}

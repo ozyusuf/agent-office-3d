@@ -1,20 +1,4 @@
-/* Stage 1 debug list. Palette tokens from docs/DESIGN.md (full theme arrives in stage 2). */
-:root {
-  --bg-void: #040414;
-  --bg-deep: #040c1c;
-  --surface: #0e213b;
-  --neon-cyan: #33b7de;
-  --neon-blue: #2c78b9;
-  --neon-purple: #724bb6;
-  --neon-magenta: #e350a4;
-  --fire-orange: #f1ad56;
-  --warn-yellow: #f4c752;
-  --ok-green: #56d999;
-  --alert-red: #ff3b5c;
-  --text: #e6f6ff;
-  --text-dim: #8aa4c0;
-  --mono: Consolas, "Cascadia Mono", ui-monospace, monospace;
-}
+/* Debug view (raw event list). Palette tokens come from theme.css. */
 
 * { box-sizing: border-box; }
 
@@ -23,7 +7,7 @@ html, body { height: 100%; margin: 0; }
 body {
   background: linear-gradient(180deg, var(--bg-deep), var(--bg-void));
   color: var(--text);
-  font: 14px/1.4 Bahnschrift, "Segoe UI", system-ui, sans-serif;
+  font: 14px/1.4 var(--font-ui);
   display: flex;
   flex-direction: column;
 }
@@ -87,10 +71,10 @@ main { flex: 1; overflow-y: auto; padding: 8px 16px 24px; }
 }
 .list summary::-webkit-details-marker { display: none; }
 
-.time { font-family: var(--mono); color: var(--text-dim); font-size: 12px; }
+.time { font-family: var(--font-mono); color: var(--text-dim); font-size: 12px; }
 
 .ev {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: 12px;
   padding: 0 6px;
   border-radius: 3px;
@@ -100,7 +84,7 @@ main { flex: 1; overflow-y: auto; padding: 8px 16px 24px; }
 
 .what { overflow-wrap: anywhere; }
 .what .tool { font-weight: 600; }
-.what .target { font-family: var(--mono); font-size: 13px; }
+.what .target { font-family: var(--font-mono); font-size: 13px; }
 .what .extra { color: var(--text-dim); font-size: 12px; margin-left: 6px; }
 
 .ev[data-cat="session"] { color: var(--neon-purple); }
@@ -116,10 +100,16 @@ main { flex: 1; overflow-y: auto; padding: 8px 16px 24px; }
 pre {
   margin: 0 0 8px;
   padding: 8px 10px;
-  font: 12px/1.45 var(--mono);
+  font: 12px/1.45 var(--font-mono);
   color: var(--text-dim);
   background: color-mix(in srgb, var(--bg-void) 70%, transparent);
   border-left: 2px solid var(--neon-cyan);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+a { color: var(--neon-cyan-soft); }
+
+.state { margin: 4px 0 10px; }
+.state summary { cursor: pointer; color: var(--text-dim); }
+.state pre { margin-top: 6px; max-height: 40vh; overflow: auto; }

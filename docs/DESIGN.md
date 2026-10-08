@@ -69,30 +69,42 @@ Must also work down to 420 px wide. Nothing scrolls; the log scrolls inside itse
 
 - **Title banner** (top centre): angled-corner frame, cyan border with magenta corner accents.
   Line 1 = realm title (uppercase, letter-spaced, white with cyan glow). Line 2 = subtitle (small,
-  cyan, letter-spaced). Default title "Cyber-Realm"; subtitle defaults to the current project folder
-  name (from the event `cwd`). Both overridable in settings. Below ~560 px width the banner takes its
+  cyan, letter-spaced). Default title is translated ("Cyber-Realm" / "Siber Diyar"); subtitle defaults
+  to the current project folder name (from the event `cwd`) and is hidden until one is known. Both
+  overridable in settings (`realmTitle`, `realmSubtitle`). Uppercase follows `<html lang>` (tr: i -> İ). Below ~560 px width the banner takes its
   own row and the stats panel + icons sit under it.
-- **Stats panel** (top left, small glass panel): header "Session" + three labelled bars, each with
-  its real value as text:
-  1. Context fill - tool uses since the last compaction (count / `contextBarMax`, default 150). Cyan.
-  2. Effort - `effort.level` from the latest event: low 1/5, medium 2/5, high 3/5, xhigh 4/5, max 5/5. Magenta.
+- **Stats panel** (top left, small glass panel): a status line (coloured dot + session state), a
+  header "Session" with the session's finished tool count, then three meters. Each meter = label and
+  real value on one line, thin bar below (the column is only ~175 px wide at 600 px):
+  1. Context fill - main-agent tool uses since the last compaction (count / `contextBarMax`, default
+     150; subagent calls do not count). "≥" when the server joined mid-session. Cyan -> green.
+  2. Effort - `effort.level` from the latest event: low 1/5, medium 2/5, high 3/5, xhigh 4/5, max 5/5;
+     "–" if no event carried it yet. Magenta.
   3. Session time - since SessionStart (or first event seen, shown with "≥"); bar fills over
      `sessionBarMinutes` (default 120). Purple.
+  Before the first event the panel shows only "waiting for events" (no bars).
 - **Status icons** (top right, row of small round glass buttons): connection (green connected /
   red dropped), session state (cyan working, grey idle, yellow waiting permission, red error,
-  dim ended), settings (gear, opens the stage-5 panel).
+  dim ended), settings (gear). Stage 2: the gear opens a small menu (language TR/EN for this tab,
+  link to the debug view); stage 5 replaces it with the full panel.
 - **Character label** (screen-projected above the character's head): round level badge
   ("Lvl" + number), text "Name · activity (file)", e.g. "Şimşek · Editing (auth.js)", and a thin
-  XP bar (magenta -> pink) showing progress to the next level.
+  XP bar (magenta -> pink) showing progress to the next level, with "xp / needed XP" under it.
+  The orange ring around the badge is decoration. The activity value is cyan, yellow while waiting
+  for permission, red on error.
 - **Station labels**: small glass pills with thin cyan border floating above each station
-  (screen-projected each frame). Active station's label brightens.
+  (screen-projected each frame). Active station's label brightens. Stage 2 shows only Code Smelter,
+  Vision & Task Board and Test Centrifuge at fixed slots (`web/stations.js`).
 - **Hook flow log** (bottom): glass panel with a centred tab title "Hook Flow" on its top edge.
   Monospace lines `[HH:MM] <readable text>`; newest at the bottom; auto-scroll; ~5 visible lines;
-  keep last 200. Lines are human sentences from i18n, e.g. "auth.js is being read...".
+  keep last 200. Lines are human sentences from i18n, e.g. "auth.js okunuyor...": values white,
+  the sentence tinted by event type. PostToolUse adds no line. "↳" marks calls inside a subagent;
+  with 2+ sessions in the log every line gets a 4-character session tag.
 - **Skill bar** (very bottom, full width, dark strip): Read, Grep, Edit, Bash, Web, Permission.
   Each = icon/dot + label. Idle = dim. Active = glows in its colour and shows "(active)".
-  Permission waiting = yellow blink (~1 Hz). Colours: Read/Grep purple-blue dot, Edit fire-orange
-  flame, Bash yellow bolt, Web blue globe, Permission yellow bell.
+  Permission waiting = yellow blink (~1 Hz). Colours: Read purple-blue dot, Grep green dot (as in
+  the reference), Edit fire-orange flame, Bash yellow bolt, Web blue globe, Permission yellow bell.
+  Turkish labels: Oku, Ara, Düzenle, Komut, Web, İzin ("İzin Bekliyor" while waiting).
 - **i18n**: one file `web/i18n.js` with `tr` and `en`; default from settings. Station names:
 
 | Key | en | tr |

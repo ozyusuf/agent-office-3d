@@ -20,18 +20,18 @@ appear in the browser list within ~1 s, in order; stopping the server does not s
 or print anything into the conversation.
 
 ## Stage 2 - Screen layout (HTML/CSS layer), palette, real data
-- [ ] Move the stage 1 list to `web/debug.html` (keep it as a dev tool)
-- [ ] `web/theme.css`: palette tokens from `DESIGN.md`
-- [ ] `web/i18n.js`: all UI strings, `tr` + `en`; default language from settings
-- [ ] Settings file (`config.json`, gitignored; `config.example.json` committed) - realm title, subtitle, agent name, language, port
-- [ ] Layout for a narrow portrait window: title banner, top-left stats panel, top-right status icons,
+- [x] Move the stage 1 list to `web/debug.html` (keep it as a dev tool)
+- [x] `web/theme.css`: palette tokens from `DESIGN.md`
+- [x] `web/i18n.js`: all UI strings, `tr` + `en`; default language from settings
+- [x] Settings file (`config.json`, gitignored; `config.example.json` committed) - realm title, subtitle, agent name, language, port
+- [x] Layout for a narrow portrait window: title banner, top-left stats panel, top-right status icons,
       character label, station label slots, hook log, skill bar
-- [ ] Server-side session state: tool count since last compact, effort level, session start, current activity
-- [ ] Persistent stats file (gitignored): total tool uses -> level + XP progress
-- [ ] Hook log: timestamped, auto-scrolling, human-readable lines in the chosen language
-- [ ] Skill bar: Read, Grep, Edit, Bash, Web, Permission. Active glows; permission blinks yellow
-- [ ] Top-right icons: server connection, session state (active / idle / ended / error), settings button
-- [ ] Empty states: before the first event show "waiting for events", never placeholder numbers
+- [x] Server-side session state: tool count since last compact, effort level, session start, current activity
+- [x] Persistent stats file (gitignored): total tool uses -> level + XP progress
+- [x] Hook log: timestamped, auto-scrolling, human-readable lines in the chosen language
+- [x] Skill bar: Read, Grep, Edit, Bash, Web, Permission. Active glows; permission blinks yellow
+- [x] Top-right icons: server connection, session state (active / idle / ended / error), settings button
+- [x] Empty states: before the first event show "waiting for events", never placeholder numbers
 
 **Done when:** the HUD matches the reference layout in a ~600x1000 window, every bar/number is
 driven by real events (verified by reading the server state), and switching language works.

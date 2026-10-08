@@ -3,25 +3,96 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Agent Office · Events</title>
-  <link rel="stylesheet" href="style.css">
+  <title>Cyber-Realm</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="hud.css">
 </head>
 <body>
-  <header class="bar">
-    <div class="title">
-      <strong>agent-office-3d</strong>
-      <span class="sub">raw hook event stream</span>
-    </div>
-    <div class="status">
-      <span id="count" class="count">0 events</span>
-      <span id="conn" class="conn" data-state="connecting">connecting…</span>
-      <button id="clear" type="button" title="Clear the list in this window only">Clear</button>
-    </div>
-  </header>
-  <main>
-    <p id="empty" class="empty">Waiting for hook events. Use Claude Code in a project that has the hooks installed.</p>
-    <ol id="list" class="list" reversed></ol>
-  </main>
+  <!-- Stage 3 puts the three.js canvas here; the HUD below is an HTML layer on top of it. -->
+  <div id="scene" class="scene" aria-hidden="true"></div>
+  <div class="frame" aria-hidden="true"></div>
+
+  <div class="hud">
+    <header class="top">
+      <section class="panel stats" id="stats" data-status="none" aria-live="polite">
+        <div class="stats-status"><span class="dot"></span><span id="status-text"></span></div>
+        <div class="stats-head"><span data-i18n="session"></span><span class="num" id="tools-done"></span></div>
+        <p class="stats-empty" id="stats-empty"></p>
+        <div class="meters" id="meters" hidden>
+          <div class="meter" data-meter="context">
+            <span class="label" data-i18n="context"></span><span class="value"></span>
+            <span class="track"><span class="fill"></span></span>
+          </div>
+          <div class="meter" data-meter="effort">
+            <span class="label" data-i18n="effort"></span><span class="value"></span>
+            <span class="track"><span class="fill"></span></span>
+          </div>
+          <div class="meter" data-meter="time">
+            <span class="label" data-i18n="time"></span><span class="value"></span>
+            <span class="track"><span class="fill"></span></span>
+          </div>
+        </div>
+      </section>
+
+      <div class="banner">
+        <h1 class="plate banner-title" id="realm-title"></h1>
+        <div class="plate banner-sub" id="realm-subtitle" hidden></div>
+      </div>
+
+      <nav class="panel icons">
+        <span class="icon" id="icon-conn" data-state="connecting" role="img">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 10a11 11 0 0 1 15 0M7.5 13.5a6.5 6.5 0 0 1 9 0"/><circle cx="12" cy="17.5" r="1.8" fill="currentColor" stroke="none"/></svg>
+        </span>
+        <span class="icon" id="icon-session" data-state="none" role="img">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12.5h4l2.5-6 4 11 2.5-5H21"/></svg>
+        </span>
+        <button class="icon" id="icon-settings" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>
+        </button>
+        <div class="panel popover" id="settings" hidden>
+          <div class="popover-title" data-i18n="settings"></div>
+          <div class="popover-row">
+            <span data-i18n="language"></span>
+            <span class="lang-buttons">
+              <button type="button" data-lang="tr">TR</button>
+              <button type="button" data-lang="en">EN</button>
+            </span>
+          </div>
+          <a class="popover-link" href="debug.html" target="_blank" rel="noopener" data-i18n="debugView"></a>
+          <p class="popover-note" data-i18n="settingsNote"></p>
+        </div>
+      </nav>
+    </header>
+
+    <main class="middle">
+      <div class="station-labels" id="station-labels"></div>
+      <div class="char-label" id="char-label">
+        <div class="lvl" id="lvl-badge"><span class="lvl-k" data-i18n="lvl"></span><span class="lvl-n" id="lvl">–</span></div>
+        <div class="char-info">
+          <div class="char-line" id="char-line"></div>
+          <div class="xp"><span class="fill" id="xp-fill"></span></div>
+          <div class="xp-text" id="xp-text"></div>
+        </div>
+      </div>
+    </main>
+
+    <section class="panel log">
+      <h2 class="plate log-tab" data-i18n="hookFlow"></h2>
+      <ol class="log-lines" id="log"></ol>
+      <p class="log-empty" id="log-empty"></p>
+    </section>
+
+    <footer class="plate skills" id="skills">
+      <span class="skill" data-skill="read"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5.5" fill="currentColor" stroke="none"/></svg><span class="name"></span><span class="tag"></span></span>
+      <span class="skill" data-skill="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5.5" fill="currentColor" stroke="none"/></svg><span class="name"></span><span class="tag"></span></span>
+      <span class="skill" data-skill="edit"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" stroke="none" d="M12.3 2c.8 3.6 5.2 5.6 5.2 11a5.5 5.5 0 0 1-11 0c0-2.6 1.3-4.3 2.6-5.5.2 1.8 1 3 2.1 3.4-.2-3-.1-6 1.1-8.9z"/></svg><span class="name"></span><span class="tag"></span></span>
+      <span class="skill" data-skill="shell"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" stroke="none" d="M14 1.5 4.5 13.5h6.2L9 22.5l10.5-13h-6.4z"/></svg><span class="name"></span><span class="tag"></span></span>
+      <span class="skill" data-skill="web"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c3 2.8 3 14.2 0 17M12 3.5c-3 2.8-3 14.2 0 17"/></svg><span class="name"></span><span class="tag"></span></span>
+      <span class="skill" data-skill="permission"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" stroke="none" d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.8 2.2H4.2z"/><path d="M10 21a2.2 2.2 0 0 0 4 0"/></svg><span class="name"></span><span class="tag"></span></span>
+    </footer>
+  </div>
+
   <script type="module" src="app.js"></script>
 </body>
 </html>

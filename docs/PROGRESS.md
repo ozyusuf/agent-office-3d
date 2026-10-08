@@ -1,11 +1,48 @@
 # Progress
 
 ## Current state
-- **Stage 1 done** (verified 2026-10-09). Next: **Stage 2 - screen layout (HTML/CSS), palette, real data.**
-- Run: `npm start`, open http://127.0.0.1:7847. Hooks are active for Claude Code sessions in this repo.
-- Hooked events: 13 (12 from the brief + `PostToolUseFailure`, D13). All Stage 1 work is committed.
+- **Stage 2 done** (verified 2026-10-09). Next: **Stage 3 - static 3D scene (three.js).**
+- Run: `npm start`, open http://127.0.0.1:7847 (HUD) or /debug.html (raw events). Restart the server
+  after pulling new server code (an old `node server/index.js` keeps running the old code).
+- Local `config.json` (gitignored) sets language etc.; XP lives in `data/stats.json` (gitignored).
 
 ## Session log (newest first)
+
+### 2026-10-09 - Session 2 - Stage 2 (HUD layout, palette, real data)
+**Done**
+- Verified against the hooks docs: `effort.level` values, `agent_id` only inside subagents,
+  SessionStart sources (incl. `fork`), PermissionRequest has **no** `tool_use_id`, Stop does
+  **not** fire on a user interrupt.
+- Server: `server/config.js` (config.json + defaults + validation), `server/state.js` (session state
+  machine, focus session, level curve), `server/stats.js` (XP file, debounced atomic writes),
+  `GET /state`, state snapshot sent with `hello` and every `event`. Hook reads the port from
+  config.json when env `AGENT_OFFICE_PORT` is not set.
+- Web: stage 1 list moved to `debug.html` (+ server state box); new HUD `index.html`, `hud.css`,
+  `theme.css`, `i18n.js` (tr/en), `narrate.js` (event -> sentence), `stations.js`, `ws.js`, favicon.
+- Tests: 38 pass (state machine, config/stats, i18n keys + every event's log line in both languages).
+- Checks (test server on another port + scratch config/data, never the user's server):
+  screenshots at 600x1000, 520 and 420 px wide; working / permission waiting / idle / error /
+  ended / two sessions / empty states; settings menu + TR<->EN switch by real clicks over the
+  DevTools protocol (no console errors); XP survives a restart; custom title renders Turkish
+  uppercase correctly; hook port lookup from config.json; live check with this session's real
+  events (effort `xhigh`, project, running command, "≥" lower bounds) via `/state` and screenshot.
+
+**Left:** stages 3-6.
+
+**Known issues / open questions**
+- Denying a permission or pressing Esc may fire no hook at all, so "waiting for permission" can stay
+  until the next prompt. (An interrupted tool does fire PostToolUseFailure with `is_interrupt`,
+  which ends the turn.)
+- A long custom realm title squeezes the stats panel at ~600 px width (text is clipped, not broken).
+- The language button in the gear menu only applies to that tab; the saved default is config.json
+  (full settings panel = stage 5).
+- Piping an event into the hook from Git Bash did not reach the server; from PowerShell (and from
+  Claude Code) it works. Use PowerShell for manual hook tests.
+- The middle of the HUD is empty until the 3D scene arrives; only 3 station labels are shown (D21).
+
+**Next step:** `/next` -> Stage 3. First tasks: `npm i three`, serve it under `/vendor/three/` with an import map, renderer with pixel-ratio cap + pause when hidden,
+orthographic isometric camera, then platforms and stations from primitives.
+
 
 ### 2026-10-09 - Session 1 - Stage 0 (docs) + Stage 1 (hook -> server -> list)
 **Done**

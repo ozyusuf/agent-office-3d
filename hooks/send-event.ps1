@@ -15,8 +15,17 @@ try {
     $startedAt = [System.Diagnostics.Process]::GetCurrentProcess().StartTime
     $hookTs = ([DateTimeOffset]$startedAt).ToUnixTimeMilliseconds()
 
+    # Port: env AGENT_OFFICE_PORT, else "port" in config.json, else 7847 (same order as the server).
     $port = 7847
-    if ($env:AGENT_OFFICE_PORT) { $port = [int]$env:AGENT_OFFICE_PORT }
+    if ($env:AGENT_OFFICE_PORT) {
+        $port = [int]$env:AGENT_OFFICE_PORT
+    } else {
+        $configFile = Join-Path $PSScriptRoot '..\config.json'
+        if ([System.IO.File]::Exists($configFile)) {
+            $found = [regex]::Match([System.IO.File]::ReadAllText($configFile), '"port"\s*:\s*(\d{4,5})\b')
+            if ($found.Success) { $port = [int]$found.Groups[1].Value }
+        }
+    }
 
     # Read stdin as raw bytes so UTF-8 survives (the console code page would mangle it).
     $stdin = [Console]::OpenStandardInput()
