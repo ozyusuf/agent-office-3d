@@ -10,6 +10,7 @@ import { STATIONS, activeStations } from './stations.js';
 const LOG_LINES = 200;
 const EVENTS_KEPT = 400; // PostToolUse events add no line, so keep more events than lines
 const EFFORT_STEPS = { low: 1, medium: 2, high: 3, xhigh: 4, max: 5 };
+const APP_NAME = 'agent-office-3d'; // banner title unless config.json sets realmTitle
 
 const $ = (id) => document.getElementById(id);
 
@@ -62,12 +63,13 @@ function applyLanguage() {
 }
 
 function renderTop() {
-  const title = view.config?.realmTitle || t('realmTitle');
+  const title = view.config?.realmTitle || APP_NAME;
   $('realm-title').textContent = title;
   document.title = title;
   const subtitle = view.config?.realmSubtitle || view.hud?.focus?.project || '';
   $('realm-subtitle').textContent = subtitle;
-  $('realm-subtitle').hidden = !subtitle;
+  // Hidden when unknown, or when it would repeat the title (e.g. working in this repo itself).
+  $('realm-subtitle').hidden = !subtitle || subtitle.toLowerCase() === title.toLowerCase();
 
   setIcon($('icon-conn'), view.conn, t(`conn.${view.conn}`));
   const status = view.hud?.focus?.status ?? 'none';

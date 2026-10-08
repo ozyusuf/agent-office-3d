@@ -5,7 +5,6 @@ export const LANGS = ['tr', 'en'];
 
 const STRINGS = {
   en: {
-    realmTitle: 'Cyber-Realm',
     connecting: 'Connecting…',
     waitingEvents: 'Waiting for events…',
     session: 'Session',
@@ -127,7 +126,6 @@ const STRINGS = {
   },
 
   tr: {
-    realmTitle: 'Siber Diyar',
     connecting: 'Bağlanıyor…',
     waitingEvents: 'Olaylar bekleniyor…',
     session: 'Oturum',

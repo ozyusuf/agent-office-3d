@@ -27,6 +27,11 @@
   uppercase correctly; hook port lookup from config.json; live check with this session's real
   events (effort `xhigh`, project, running command, "≥" lower bounds) via `/state` and screenshot.
 
+- Follow-up (user): banner default is now "agent-office-3d", agent name "Claude"; the "Siber Diyar /
+  Cyber-Realm" name is gone (D23).
+- Published (user): public repo https://github.com/ozyusuf/agent-office-3d, MIT license, short
+  README (work in progress). Commit author email = GitHub no-reply address (D24).
+
 **Left:** stages 3-6.
 
 **Known issues / open questions**

@@ -69,10 +69,11 @@ Must also work down to 420 px wide. Nothing scrolls; the log scrolls inside itse
 
 - **Title banner** (top centre): angled-corner frame, cyan border with magenta corner accents.
   Line 1 = realm title (uppercase, letter-spaced, white with cyan glow). Line 2 = subtitle (small,
-  cyan, letter-spaced). Default title is translated ("Cyber-Realm" / "Siber Diyar"); subtitle defaults
-  to the current project folder name (from the event `cwd`) and is hidden until one is known. Both
-  overridable in settings (`realmTitle`, `realmSubtitle`). Uppercase follows `<html lang>` (tr: i -> İ). Below ~560 px width the banner takes its
-  own row and the stats panel + icons sit under it.
+  cyan, letter-spaced). Default title "agent-office-3d" (same in every language); subtitle defaults
+  to the current project folder name (from the event `cwd`), hidden until one is known or when it
+  equals the title. Both overridable in settings (`realmTitle`, `realmSubtitle`). Uppercase follows
+  `<html lang>` (tr: i -> İ). The names in the reference image are only examples (D23).
+  Below ~560 px width the banner takes its own row and the stats panel + icons sit under it.
 - **Stats panel** (top left, small glass panel): a status line (coloured dot + session state), a
   header "Session" with the session's finished tool count, then three meters. Each meter = label and
   real value on one line, thin bar below (the column is only ~175 px wide at 600 px):
@@ -88,7 +89,7 @@ Must also work down to 420 px wide. Nothing scrolls; the log scrolls inside itse
   dim ended), settings (gear). Stage 2: the gear opens a small menu (language TR/EN for this tab,
   link to the debug view); stage 5 replaces it with the full panel.
 - **Character label** (screen-projected above the character's head): round level badge
-  ("Lvl" + number), text "Name · activity (file)", e.g. "Şimşek · Editing (auth.js)", and a thin
+  ("Lvl" + number), text "Name · activity (file)", e.g. "Claude · Editing (auth.js)", and a thin
   XP bar (magenta -> pink) showing progress to the next level, with "xp / needed XP" under it.
   The orange ring around the badge is decoration. The activity value is cyan, yellow while waiting
   for permission, red on error.

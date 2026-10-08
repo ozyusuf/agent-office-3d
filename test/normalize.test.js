@@ -105,9 +105,9 @@ test('event-specific fields', () => {
 });
 
 test('prompt preview is one line, max 120 chars, Turkish text intact', () => {
-  const prompt = `Şimşek'ın şeyi ığüö\n${'a'.repeat(300)}`;
+  const prompt = `Şu dosyayı düzelt ığüöç\n${'a'.repeat(300)}`;
   const e = normalize({ ...base, hook_event_name: 'UserPromptSubmit', prompt }, meta);
-  assert.equal(e.promptPreview, "Şimşek'ın şeyi ığüö");
+  assert.equal(e.promptPreview, 'Şu dosyayı düzelt ığüöç');
   const long = normalize({ ...base, hook_event_name: 'UserPromptSubmit', prompt: 'b'.repeat(300) }, meta);
   assert.equal(long.promptPreview.length, 120);
 });

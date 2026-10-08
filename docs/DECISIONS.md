@@ -110,6 +110,16 @@ which labels to show once they are projected from the 3D stations.
 **D22. HUD details that differ from the first DESIGN.md draft:** Grep's dot is green (as in the
 reference image, not purple-blue); Turkish skill labels are words (Oku, Ara, Düzenle, Komut, Web,
 İzin); the stats meters are stacked (label + value, bar below) because the top-left column is only
-~175 px wide at 600 px; an empty realm title means a translated default ("Siber Diyar" /
-"Cyber-Realm"); the level ring is decoration, the XP bar under the name is the data.
+~175 px wide at 600 px; an empty realm title means a default title (changed by D23); the level ring is decoration, the XP bar under the name is the data.
 System fonts only for now (Bahnschrift, Consolas), so nothing is downloaded.
+
+**D23. Default banner title = "agent-office-3d"; default agent name = "Claude" (user, 2026-10-09).**
+Replaces the translated "Cyber-Realm" / "Siber Diyar" default from D22. The title and the name in the
+reference image are only examples and are not used anywhere. The subtitle (project folder) is
+hidden when it equals the title, so working in this repo does not show "AGENT-OFFICE-3D" twice.
+
+**D24. Public GitHub repo, MIT license, no-reply commit email (user, 2026-10-09).**
+The user wants anyone to be able to use the project, so it is public under MIT (permissive, the
+most common choice). Commits use the GitHub no-reply address (set in this repo's git config; the two
+earlier commits were rewritten before the first push) so the personal email is not published.
+Replaces "choose a license in stage 6" in PLAN.md.

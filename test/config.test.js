@@ -15,10 +15,10 @@ test('no config file -> defaults', () => {
 });
 
 test('valid values are used, strings trimmed', () => {
-  const { config, warnings } = parseConfig({ language: 'tr', agentName: '  Şimşek ', realmTitle: "Şimşek'ın Siber-Diyarı", port: 8000 }, {});
+  const { config, warnings } = parseConfig({ language: 'tr', agentName: '  Claude ', realmTitle: 'Çalışma Odası İşığı', port: 8000 }, {});
   assert.equal(config.language, 'tr');
-  assert.equal(config.agentName, 'Şimşek');
-  assert.equal(config.realmTitle, "Şimşek'ın Siber-Diyarı");
+  assert.equal(config.agentName, 'Claude');
+  assert.equal(config.realmTitle, 'Çalışma Odası İşığı');
   assert.equal(config.port, 8000);
   assert.deepEqual(warnings, []);
 });

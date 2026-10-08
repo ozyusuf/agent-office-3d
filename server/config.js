@@ -9,7 +9,7 @@ export const LANGUAGES = ['en', 'tr'];
 export const DEFAULTS = Object.freeze({
   language: 'en',
   agentName: 'Claude',
-  realmTitle: '', // empty = translated default ("Cyber-Realm" / "Siber Diyar")
+  realmTitle: '', // empty = "agent-office-3d"
   realmSubtitle: '', // empty = project folder name of the current session
   port: 7847,
   contextBarMax: 150, // tool calls since the last compaction that fill the context bar

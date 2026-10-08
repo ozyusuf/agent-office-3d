@@ -79,7 +79,7 @@ stop) plays out visibly on screen with correct stations and no stuck states.
 - [ ] English README: what it is, screenshots, requirements, install, privacy (localhost only)
 - [ ] "How it was built" guide (`docs/HOW-IT-WAS-BUILT.md`) from PROGRESS + DECISIONS
 - [ ] Screenshots / short GIF of each state
-- [ ] Choose a license with the user; add LICENSE file
+- [x] Choose a license with the user; add LICENSE file (MIT, 2026-10-09)
 - [ ] Cross-platform note: hook script for macOS/Linux (sh/curl) or document Windows-only
 
 **Done when:** a fresh clone can be installed on another Windows machine by following only the README.
