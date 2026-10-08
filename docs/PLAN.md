@@ -37,16 +37,16 @@ or print anything into the conversation.
 driven by real events (verified by reading the server state), and switching language works.
 
 ## Stage 3 - Static 3D scene
-- [ ] `npm i three`; serve `node_modules/three` under `/vendor/three/` with an import map
-- [ ] Renderer: pixel ratio cap, pause on `visibilitychange`, resize to portrait window
-- [ ] Isometric (orthographic) camera framed for portrait
-- [ ] Floating metal platforms, pipes, neon edge strips, background haze
-- [ ] Stations built from primitives: command desk, Code Smelter, Vision & Task Board, Test Centrifuge,
+- [x] `npm i three`; serve `node_modules/three` under `/vendor/three/` with an import map
+- [x] Renderer: pixel ratio cap, pause on `visibilitychange`, resize to portrait window
+- [x] Isometric (orthographic) camera framed for portrait
+- [x] Floating metal platforms, pipes, neon edge strips, background haze
+- [x] Stations built from primitives: command desk, Code Smelter, Vision & Task Board, Test Centrifuge,
       Orbit Sphere, server racks, data waterfalls, portal ring, arcade machine
-- [ ] Character from simple shapes (headphones, visor, hoodie). If not good enough: propose a CC0 model, ask first
-- [ ] Bloom (UnrealBloomPass) with a toggle; fallback without postprocessing
-- [ ] Station labels projected from 3D positions into the HTML layer
-- [ ] FPS check on a weak GPU profile (bloom off, pixel ratio 1)
+- [x] Character from simple shapes (headphones, visor, hoodie). If not good enough: propose a CC0 model, ask first
+- [x] Bloom (UnrealBloomPass) with a toggle; fallback without postprocessing
+- [x] Station labels projected from 3D positions into the HTML layer
+- [x] FPS check on a weak GPU profile (bloom off, pixel ratio 1)
 
 **Done when:** the scene reads like the reference at a glance, runs smoothly with bloom on,
 stops drawing when hidden, and all labels track their stations.

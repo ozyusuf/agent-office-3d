@@ -123,3 +123,50 @@ The user wants anyone to be able to use the project, so it is public under MIT (
 most common choice). Commits use the GitHub no-reply address (set in this repo's git config; the two
 earlier commits were rewritten before the first push) so the personal email is not published.
 Replaces "choose a license in stage 6" in PLAN.md.
+
+## 2026-10-09 - Stage 3
+
+**D25. three.js (r186, MIT) is served from `node_modules` under `/vendor/three/`, via an import map.**
+No bundler and no CDN, so the page works offline. Only `.js` files inside `build/` and
+`examples/jsm/` are reachable (path traversal returns 404). `app.js` loads the scene with a dynamic
+`import()`, so the HUD still works when WebGL or three.js fails; labels then fall back to the
+stage 2 slots and the gear menu says the 3D scene is unavailable.
+
+**D26. Layers: 3D canvas -> label layer -> frame -> HUD panels.** Labels live in their own
+full-window layer under the HUD, so the glass panels cover a label that drifts behind them.
+
+**D27. Station label visibility (replaces D21).** Always: Code Smelter, Vision & Task Board, Test
+Centrifuge (as in the reference). Only while active: Orbit Sphere, Server Racks, Portal Ring,
+Arcade. Never: the desk (the character label is above it) and the data falls (no event drives them).
+Showing all nine at once crowds a narrow window.
+
+**D28. Labels shrink with the scene and step aside when they overlap (user feedback: things were
+piled on top of each other in a ~700x765 window).** Scale = scene px-per-unit / 40, clamped to
+0.7-1. Overlaps are resolved greedily, the shortest of up/down/left/right; priority: character
+label, then active stations, then idle ones.
+
+**D29. Camera framing:** the main platform takes at most 78 % of the free middle area's width, and
+the span from the big portal down to the lower data-fall basin at most its height (plus 14 px above
+and 28 px below, behind the glass). Side platforms may run off the edges, as in the reference.
+Windows under 820 px tall show 4 Hook Flow lines instead of 6 so the scene gets more room.
+
+**D30. The command desk is a ring console open towards the camera.** With a closed arc in front,
+the 35° view hid everything below the character's eyes. The holo keyboard floats in the opening.
+
+**D31. Performance choices (measured on this machine's Intel UHD, headless Edge with GPU):**
+no shadows; MSAA on the bloom render target only below pixel ratio 1.5 (4x MSAA on a HalfFloat
+target at 1.5x dropped 55 -> 40 fps; without it the default settings run at the frame cap); frames
+closer than 1000/75 ms are skipped (a 1000/62 cap dropped frames on 60 Hz screens because of jitter).
+Skin and hair get a little emissive so the character reads under the cyan lights.
+
+**D32. 3D quality settings: `bloom` (default true) and `pixelRatioCap` (default 1.5) in
+config.json;** the gear menu (and `?bloom=0|1&pr=1|1.5|2`) overrides them for one tab, like the
+language (D20). The menu also shows the measured fps and draw calls. Stage 5 makes them editable.
+
+**D33. Decoration is not data.** The board's "code" is coloured bars only (no characters or
+numbers); rack LEDs stay unlit until stage 4 lights them by context fill; ambient loops (flames,
+falls, rings, dust) carry no meaning until stage 4 ties them to events.
+
+**D34. Turkish station names (user, 2026-10-09):** smelter = "Kod Ocağı" ("Kod Ergitme" was
+unclear), centrifuge = "Test Laboratuvarı" ("Test Sınama" repeats itself; the user wants a
+test-related name, "Komut Çarkı" was rejected). English names unchanged.

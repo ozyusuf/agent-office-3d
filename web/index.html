@@ -7,10 +7,23 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="theme.css">
   <link rel="stylesheet" href="hud.css">
+  <script type="importmap">
+    { "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/examples/jsm/" } }
+  </script>
 </head>
 <body>
-  <!-- Stage 3 puts the three.js canvas here; the HUD below is an HTML layer on top of it. -->
+  <!-- Layers, bottom to top: three.js canvas, labels that follow 3D stations, frame, HUD panels. -->
   <div id="scene" class="scene" aria-hidden="true"></div>
+  <div class="labels" id="labels">
+    <div class="char-label" id="char-label" data-anchor="character" data-slot="0.5,0.26">
+      <div class="lvl" id="lvl-badge"><span class="lvl-k" data-i18n="lvl"></span><span class="lvl-n" id="lvl">–</span></div>
+      <div class="char-info">
+        <div class="char-line" id="char-line"></div>
+        <div class="xp"><span class="fill" id="xp-fill"></span></div>
+        <div class="xp-text" id="xp-text"></div>
+      </div>
+    </div>
+  </div>
   <div class="frame" aria-hidden="true"></div>
 
   <div class="hud">
@@ -54,28 +67,35 @@
           <div class="popover-title" data-i18n="settings"></div>
           <div class="popover-row">
             <span data-i18n="language"></span>
-            <span class="lang-buttons">
+            <span class="seg-buttons">
               <button type="button" data-lang="tr">TR</button>
               <button type="button" data-lang="en">EN</button>
             </span>
           </div>
+          <div class="popover-row" id="row-bloom">
+            <span data-i18n="bloom"></span>
+            <span class="seg-buttons">
+              <button type="button" data-bloom="1" data-i18n="on"></button>
+              <button type="button" data-bloom="0" data-i18n="off"></button>
+            </span>
+          </div>
+          <div class="popover-row" id="row-pr">
+            <span data-i18n="pixelRatio"></span>
+            <span class="seg-buttons">
+              <button type="button" data-pr="1">1×</button>
+              <button type="button" data-pr="1.5">1.5×</button>
+              <button type="button" data-pr="2">2×</button>
+            </span>
+          </div>
+          <p class="popover-fps" id="fps"></p>
           <a class="popover-link" href="debug.html" target="_blank" rel="noopener" data-i18n="debugView"></a>
           <p class="popover-note" data-i18n="settingsNote"></p>
         </div>
       </nav>
     </header>
 
-    <main class="middle">
-      <div class="station-labels" id="station-labels"></div>
-      <div class="char-label" id="char-label">
-        <div class="lvl" id="lvl-badge"><span class="lvl-k" data-i18n="lvl"></span><span class="lvl-n" id="lvl">–</span></div>
-        <div class="char-info">
-          <div class="char-line" id="char-line"></div>
-          <div class="xp"><span class="fill" id="xp-fill"></span></div>
-          <div class="xp-text" id="xp-text"></div>
-        </div>
-      </div>
-    </main>
+    <!-- Free area between the panels: the 3D scene is framed into it. -->
+    <main class="middle" id="middle"></main>
 
     <section class="panel log">
       <h2 class="plate log-tab" data-i18n="hookFlow"></h2>

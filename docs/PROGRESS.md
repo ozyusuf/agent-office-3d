@@ -1,12 +1,56 @@
 # Progress
 
 ## Current state
-- **Stage 2 done** (verified 2026-10-09). Next: **Stage 3 - static 3D scene (three.js).**
-- Run: `npm start`, open http://127.0.0.1:7847 (HUD) or /debug.html (raw events). Restart the server
-  after pulling new server code (an old `node server/index.js` keeps running the old code).
-- Local `config.json` (gitignored) sets language etc.; XP lives in `data/stats.json` (gitignored).
+- **Stage 3 done** (verified 2026-10-09). Next: **Stage 4 - events -> animations.**
+- Run: `npm install` (three.js was added), `npm start`, open http://127.0.0.1:7847 (HUD) or
+  /debug.html (raw events). Restart the server after pulling new server code (an old
+  `node server/index.js` keeps running the old code and has no `/vendor/three/` route).
+- Local `config.json` (gitignored) sets language, `bloom`, `pixelRatioCap` etc.; XP lives in
+  `data/stats.json` (gitignored).
 
 ## Session log (newest first)
+
+### 2026-10-09 - Session 3 - Stage 3 (static 3D scene)
+**Done**
+- `npm i three` (r186, MIT); server serves `build/` + `examples/jsm/` under `/vendor/three/`
+  (traversal probes -> 404); import map in `index.html`; scene loaded with dynamic `import()` (D25).
+- `web/scene/`: `realm.js` (ortho camera 35°/45°, ACES, UnrealBloomPass + OutputPass, fog, loop
+  with ~60 fps cap, pause when hidden, framing into the free HUD area), `world.js` (5 chamfered
+  platforms with neon rims and slit lights, pipes, cables, sky gradient, haze, dust, glyph columns,
+  lights, procedural neon environment map), `props.js` (all 9 stations + decor, ambient motion),
+  `character.js` (chibi from primitives), `kit.js` (cached materials, canvas textures, helpers).
+  `web/palette.js` mirrors theme.css. Nothing downloaded besides three.js.
+- `web/labels.js`: station + character labels follow 3D anchors, shrink with the scene, step aside
+  when they overlap (D27, D28). Gear menu: bloom on/off, pixel ratio 1/1.5/2, measured fps + draw
+  calls. Config keys `bloom`, `pixelRatioCap` (+ tests). Station label test. 39 tests pass.
+- User feedback applied: overlapping labels in a ~700x765 window (scaling + collision + bigger
+  scene in short windows, D28/D29); Turkish names "Kod Ocağı" and "Test Laboratuvarı" (D34).
+- Checks (scratch server on port 7861 + scratch config/data; test events only there): screenshots at
+  420x900, 520x960, 600x1000, 702x765 @1.5x, 960x1040, 1280x720; working / compacting / helper /
+  web states show the right labels; no-WebGL fallback (`--disable-webgl`); draw calls counted by
+  hooking WebGL: ~11,600/s visible, 0 while hidden, resumes when shown; fps on Intel UHD (headless
+  Edge, rAF 165 Hz, so the cap shows as 55 = 60 on a real screen): default settings at the cap for
+  DPR 1, 1.25, 1.5 and 2; pixel ratio 2 + bloom on a DPR 2 screen = 42 fps.
+
+**Left:** stages 4-6.
+
+**Known issues / open questions**
+- Stage 4 decision: the Test Laboratuvarı lights up for every Bash/PowerShell call (DESIGN.md); the
+  user expects it for tests. Option offered: only test commands (`npm test`, `pytest`, ...) go there,
+  other commands go to the desk. Ask/decide at the start of stage 4.
+- fps numbers come from headless Edge, not a real window; a check in the user's real browser is
+  still worth doing (gear menu shows fps).
+- Labels step aside greedily each frame; once the character moves (stage 4) they may jump between
+  positions and might need smoothing.
+- The lower data-fall basin can sit partly behind the Hook Flow panel (by design, D29).
+- `prefers-reduced-motion` is not applied to the 3D ambient loops yet.
+- First load logs a harmless D3D shader compiler warning (X4122) from ANGLE.
+
+**Next step:** `/next` -> Stage 4. First tasks: settle the Test Laboratuvarı question, then a
+client-side scene state fed by the server snapshot, character walking/turning between stations,
+and the event -> reaction table rows one by one (rack LEDs from context fill, falls speed from
+activity rate).
+
 
 ### 2026-10-09 - Session 2 - Stage 2 (HUD layout, palette, real data)
 **Done**

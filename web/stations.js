@@ -1,17 +1,19 @@
 // Realm stations (docs/DESIGN.md section 4) and which one is "active" for the current state.
-// `slot` = label position as a fraction of the middle HUD area. These are fixed until stage 3
-// projects each label from its 3D station; stations without a slot get a label in stage 3.
+// `label`: 'always' = label always shown (the three from the reference image), 'active' = shown
+// only while the station is in use, 'never' = no label (the character label covers the desk).
+// Labels follow the 3D stations (web/labels.js); `slot` is the fallback position (fraction of the
+// HUD's middle area) when the 3D scene is unavailable.
 
 export const STATIONS = [
-  { key: 'desk' },
-  { key: 'smelter', slot: [0.24, 0.52] },
-  { key: 'board', slot: [0.7, 0.36] },
-  { key: 'centrifuge', slot: [0.76, 0.76] },
-  { key: 'orbit' },
-  { key: 'racks' },
-  { key: 'falls' },
-  { key: 'portal' },
-  { key: 'arcade' },
+  { key: 'desk', label: 'never' },
+  { key: 'smelter', label: 'always', slot: [0.24, 0.52] },
+  { key: 'board', label: 'always', slot: [0.7, 0.36] },
+  { key: 'centrifuge', label: 'always', slot: [0.76, 0.76] },
+  { key: 'orbit', label: 'active' },
+  { key: 'racks', label: 'active' },
+  { key: 'falls', label: 'never' },
+  { key: 'portal', label: 'active' },
+  { key: 'arcade', label: 'active' },
 ];
 
 const BY_KIND = {

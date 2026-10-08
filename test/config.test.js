@@ -21,14 +21,19 @@ test('valid values are used, strings trimmed', () => {
   assert.equal(config.realmTitle, 'Çalışma Odası İşığı');
   assert.equal(config.port, 8000);
   assert.deepEqual(warnings, []);
+  const quality = parseConfig({ bloom: false, pixelRatioCap: 1 }, {}).config;
+  assert.equal(quality.bloom, false);
+  assert.equal(quality.pixelRatioCap, 1);
 });
 
 test('invalid values fall back with a warning', () => {
-  const { config, warnings } = parseConfig({ language: 'de', port: 80, contextBarMax: 'x', extra: 1 }, {});
+  const { config, warnings } = parseConfig({ language: 'de', port: 80, contextBarMax: 'x', extra: 1, bloom: 'no', pixelRatioCap: 9 }, {});
   assert.equal(config.language, DEFAULTS.language);
+  assert.equal(config.bloom, true);
+  assert.equal(config.pixelRatioCap, 1.5);
   assert.equal(config.port, DEFAULTS.port);
   assert.equal(config.contextBarMax, DEFAULTS.contextBarMax);
-  assert.equal(warnings.length, 4);
+  assert.equal(warnings.length, 6);
 });
 
 test('env AGENT_OFFICE_PORT overrides config port', () => {

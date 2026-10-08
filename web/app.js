@@ -6,6 +6,7 @@ import { connectLive } from './ws.js';
 import { LANGS, makeTranslator } from './i18n.js';
 import { logEntry, activityParts, formatDuration } from './narrate.js';
 import { STATIONS, activeStations } from './stations.js';
+import { createLabelLayer } from './labels.js';
 
 const LOG_LINES = 200;
 const EVENTS_KEPT = 400; // PostToolUse events add no line, so keep more events than lines
@@ -21,12 +22,22 @@ const view = {
   events: [], // recent events for the log
   lang: langFromUrl(), // explicit choice in this page; otherwise config.language
   multiSession: false,
+  // 3D quality: explicit choice in this page (menu, or ?bloom=0|1&pr=1|1.5|2); otherwise config.json
+  bloom: fromUrl('bloom', (v) => (v === '1' ? true : v === '0' ? false : null)),
+  pixelRatioCap: fromUrl('pr', (v) => (Number(v) >= 0.5 && Number(v) <= 3 ? Number(v) : null)),
 };
 let t = makeTranslator(view.lang ?? 'en');
+let realm = null; // the 3D scene once loaded; stays null without WebGL
+const labels = createLabelLayer($('labels'), $('middle'));
 
 function langFromUrl() {
   const lang = new URLSearchParams(location.search).get('lang');
   return LANGS.includes(lang) ? lang : null;
+}
+
+function fromUrl(name, parse) {
+  const value = new URLSearchParams(location.search).get(name);
+  return value === null ? null : parse(value);
 }
 
 // ---- Rendering ----
@@ -60,6 +71,7 @@ function applyLanguage() {
   $('icon-settings').setAttribute('aria-label', t('settings'));
   $('log-empty').textContent = view.hud ? t('waitingEvents') : t('connecting');
   $('stats-empty').textContent = t('waitingEvents');
+  renderQuality();
 }
 
 function renderTop() {
@@ -135,27 +147,31 @@ function renderCharacter() {
   if (view.hud) appendParts(line, activityParts(view.hud.focus, t));
   else line.append(t('connecting'));
   line.title = line.textContent;
+  labels.changed($('char-label'));
 }
 
+const stationLabels = STATIONS.filter((s) => s.label !== 'never').map((station) => {
+  const label = el('div', 'station-label');
+  label.dataset.station = station.key;
+  label.dataset.anchor = station.key;
+  if (station.slot) label.dataset.slot = station.slot.join(',');
+  $('labels').prepend(label);
+  return { station, label };
+});
+
 function renderStations() {
-  const layer = $('station-labels');
-  if (!layer.children.length) {
-    for (const station of STATIONS) {
-      const label = el('div', 'station-label');
-      label.dataset.station = station.key;
-      if (station.slot) {
-        label.style.left = `${station.slot[0] * 100}%`;
-        label.style.top = `${station.slot[1] * 100}%`;
-      } else {
-        label.hidden = true; // positioned by the 3D scene in stage 3
-      }
-      layer.append(label);
-    }
-  }
   const on = activeStations(view.hud?.focus);
-  for (const label of layer.children) {
-    label.textContent = t(`station.${label.dataset.station}`);
-    label.dataset.active = String(on.has(label.dataset.station));
+  for (const { station, label } of stationLabels) {
+    const active = on.has(station.key);
+    // Without the 3D scene only the labels with a fixed slot can be placed.
+    const show = Boolean(realm || station.slot) && (station.label === 'always' || active);
+    const text = t(`station.${station.key}`);
+    if (label.hidden === show || label.textContent !== text) {
+      label.hidden = !show;
+      label.textContent = text;
+      labels.changed(label);
+    }
+    label.dataset.active = String(active);
   }
 }
 
@@ -271,12 +287,84 @@ function setupSettings() {
       renderAll();
     });
   }
+  // Bloom and pixel ratio: this page only, like the language.
+  for (const button of menu.querySelectorAll('[data-bloom]')) {
+    button.addEventListener('click', () => {
+      view.bloom = button.dataset.bloom === '1';
+      applyQuality();
+    });
+  }
+  for (const button of menu.querySelectorAll('[data-pr]')) {
+    button.addEventListener('click', () => {
+      view.pixelRatioCap = Number(button.dataset.pr);
+      applyQuality();
+    });
+  }
+  // The measured frame rate is refreshed while the menu is open.
+  setInterval(() => {
+    if (!menu.hidden) renderQuality();
+  }, 1000);
+}
+
+// ---- 3D scene ----
+
+function quality() {
+  return {
+    bloom: view.bloom ?? view.config?.bloom ?? true,
+    pixelRatioCap: view.pixelRatioCap ?? view.config?.pixelRatioCap ?? 1.5,
+  };
+}
+
+function applyQuality() {
+  const q = quality();
+  realm?.setBloom(q.bloom);
+  realm?.setPixelRatioCap(q.pixelRatioCap);
+  renderQuality();
+}
+
+function renderQuality() {
+  const q = quality();
+  for (const button of document.querySelectorAll('[data-bloom]')) {
+    button.setAttribute('aria-pressed', String((button.dataset.bloom === '1') === q.bloom));
+  }
+  for (const button of document.querySelectorAll('[data-pr]')) {
+    button.setAttribute('aria-pressed', String(Number(button.dataset.pr) === q.pixelRatioCap));
+  }
+  $('row-bloom').hidden = !realm;
+  $('row-pr').hidden = !realm;
+  const stats = realm?.stats();
+  $('fps').textContent = !realm ? t('noScene') : stats.running ? t('fps', { fps: stats.fps, calls: stats.drawCalls }) : '';
+}
+
+async function startScene() {
+  try {
+    const { createRealm } = await import('./scene/realm.js');
+    realm = createRealm($('scene'), {
+      ...quality(),
+      // The free middle area, plus a little room behind the glass panels above and below it.
+      getViewRect: () => {
+        const r = $('middle').getBoundingClientRect();
+        return new DOMRect(r.left, r.top - 14, r.width, r.height + 14 + 28);
+      },
+      onFrame: labels.update,
+    });
+    labels.attach(realm);
+    // The free middle area changes with the window and with the panels' sizes.
+    new ResizeObserver(() => realm.reframe()).observe($('middle'));
+  } catch (err) {
+    console.warn('3D scene unavailable:', err);
+    realm = null;
+  }
+  renderStations();
+  renderQuality();
+  labels.update();
 }
 
 // ---- Start ----
 
 setupSettings();
 renderAll();
+startScene();
 
 connectLive({
   onStatus(state) {
@@ -288,6 +376,7 @@ connectLive({
     view.hud = data.state;
     view.events = data.history.slice(-EVENTS_KEPT);
     renderAll();
+    applyQuality();
   },
   onEvent(data) {
     view.hud = data.state;

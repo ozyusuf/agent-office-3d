@@ -14,10 +14,14 @@ export const DEFAULTS = Object.freeze({
   port: 7847,
   contextBarMax: 150, // tool calls since the last compaction that fill the context bar
   sessionBarMinutes: 120, // session length that fills the time bar
+  bloom: true, // glow post-processing in the 3D scene (off = faster on weak GPUs)
+  pixelRatioCap: 1.5, // max device pixel ratio the 3D scene renders at
 });
 
 const text = (max) => (v) => typeof v === 'string' && v.length <= max;
 const int = (min, max) => (v) => Number.isInteger(v) && v >= min && v <= max;
+const num = (min, max) => (v) => typeof v === 'number' && v >= min && v <= max;
+const bool = (v) => typeof v === 'boolean';
 
 const RULES = {
   language: (v) => LANGUAGES.includes(v),
@@ -27,6 +31,8 @@ const RULES = {
   port: int(1024, 65535),
   contextBarMax: int(10, 100000),
   sessionBarMinutes: int(5, 24 * 60),
+  bloom: bool,
+  pixelRatioCap: num(0.5, 3),
 };
 
 /**

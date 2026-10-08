@@ -94,10 +94,14 @@ Must also work down to 420 px wide. Nothing scrolls; the log scrolls inside itse
   The orange ring around the badge is decoration. The activity value is cyan, yellow while waiting
   for permission, red on error.
 - **Station labels**: small glass pills with thin cyan border floating above each station
-  (screen-projected each frame). Active station's label brightens. Stage 2 shows only Code Smelter,
-  Vision & Task Board and Test Centrifuge at fixed slots (`web/stations.js`).
+  (screen-projected each frame, `web/labels.js`). Active station's label brightens. Always shown:
+  Code Smelter, Vision & Task Board, Test Centrifuge; shown only while active: Orbit Sphere, Server
+  Racks, Portal Ring, Arcade; never: desk (the character label is there) and data falls
+  (`web/stations.js`). Labels shrink with the scene in small windows (down to 70 %) and step aside
+  the shortest way when they would overlap (character label first, then active stations).
+  They sit below the HUD panels, so the glass covers them. Without WebGL: fixed slots, stage 2 style.
 - **Hook flow log** (bottom): glass panel with a centred tab title "Hook Flow" on its top edge.
-  Monospace lines `[HH:MM] <readable text>`; newest at the bottom; auto-scroll; ~5 visible lines;
+  Monospace lines `[HH:MM] <readable text>`; newest at the bottom; auto-scroll; 6 visible lines (4 in windows under 820 px tall);
   keep last 200. Lines are human sentences from i18n, e.g. "auth.js okunuyor...": values white,
   the sentence tinted by event type. PostToolUse adds no line. "↳" marks calls inside a subagent;
   with 2+ sessions in the log every line gets a 4-character session tag.
@@ -111,9 +115,9 @@ Must also work down to 420 px wide. Nothing scrolls; the log scrolls inside itse
 | Key | en | tr |
 |---|---|---|
 | desk | Command Desk | Komuta Masası |
-| smelter | Code Smelter | Kod Ergitme |
+| smelter | Code Smelter | Kod Ocağı |
 | board | Vision & Task Board | Görüş ve Görev Panosu |
-| centrifuge | Test Centrifuge | Test Sınama |
+| centrifuge | Test Centrifuge | Test Laboratuvarı |
 | orbit | Orbit Sphere | Yörünge Küresi |
 | racks | Server Racks | Sunucu Kabinleri |
 | falls | Data Falls | Veri Şelaleleri |
@@ -128,7 +132,7 @@ Placement as seen in the reference (screen positions inside the realm view):
 
 | Object | Where | Look | Driven by |
 |---|---|---|---|
-| Command desk + character | centre | round desk, glowing cyan rim, holo keyboard; character sits/stands at it | everything |
+| Command desk + character | centre | round dais with cyan rings; ring console open towards the camera (a closed front hid the character), holo keyboard in the opening; character stands inside | everything |
 | Code Smelter | left of centre, slightly lower | boxy furnace, orange fire core, sparks | Edit, Write, NotebookEdit |
 | Vision & Task Board | right/behind character | large curved holo screen (blue, cyan code lines) | Read, Grep, Glob, todo/task tools |
 | Test Centrifuge | bottom right | 3 nested gimbal rings (magenta, cyan, yellow) on a base | Bash, PowerShell |
@@ -142,9 +146,20 @@ Placement as seen in the reference (screen positions inside the realm view):
 Character: chibi proportions (big head), dark hoodie with cyan trims, headphones, cyan visor
 glasses, messy dark hair. Build from primitives first; if it looks poor, propose a CC0 model and ask.
 
+Framing: the main platform takes at most 78 % of the free middle area's width, and the scene from the
+big portal down to the lower data-fall basin at most its height (+ a little room behind the glass
+panels). Side platforms may run off the window edges, as in the reference.
+
 Performance: `renderer.setPixelRatio(Math.min(devicePixelRatio, cap))` (default cap 1.5), stop the
 loop on `document.hidden`, bloom toggle (UnrealBloomPass, half-res), shared materials, instanced
-LEDs/particles, no shadows by default, target 60 fps on integrated GPUs with bloom off.
+LEDs/particles, no shadows, frames closer than 1000/75 ms are skipped (60 Hz draws every frame,
+120/144 Hz draw 60/72). MSAA on the bloom target only below pixel ratio 1.5. Target 60 fps on
+integrated GPUs with the default settings (measured on Intel UHD, see PROGRESS session 3).
+Settings: `bloom`, `pixelRatioCap` in config.json; the gear menu overrides them for one tab.
+
+Decoration vs data: the board's "code" is coloured bars only (no characters or numbers), rack LEDs
+stay unlit until stage 4 lights them by context fill, and ambient loops (flames, falls, rings,
+dust) carry no meaning until stage 4 ties them to events.
 
 ## 5. Event -> reaction
 Every reaction is caused by a real event. "Pair" = matched by `tool_use_id`.

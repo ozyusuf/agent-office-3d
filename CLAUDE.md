@@ -1,8 +1,7 @@
 # agent-office-3d
 
-A cyber-RPG themed 3D live monitor that shows what the Claude Code agent is doing right now.
-Runs in a separate, narrow portrait browser window (half the screen) next to VS Code. Open source;
-a "how it was built" guide will be written at the end.
+A cyber-RPG themed 3D live monitor that shows what the Claude Code agent is doing right now. Runs in a
+narrow portrait browser window next to VS Code. Open source; a "how it was built" guide comes at the end.
 
 **Every session: read `docs/PROGRESS.md` at the start and update it at the end.**
 
@@ -10,11 +9,14 @@ a "how it was built" guide will be written at the end.
 Claude Code hooks -> local server (127.0.0.1 only) -> WebSocket -> three.js page.
 - `hooks/send-event.ps1` - PowerShell hook script. Forwards the raw hook JSON (stdin) to `POST /event`.
 - `server/index.js` - Node HTTP + `ws` server: receives events, reorders by hook start time,
-  keeps recent history, broadcasts event + state snapshot, serves `web/`, `GET /state`.
+  keeps recent history, broadcasts event + state snapshot, serves `web/`, `GET /state`, and
+  three.js from `node_modules` under `/vendor/three/` (import map in `index.html`).
 - `server/normalize.js` - raw hook JSON -> small display event. `server/state.js` - session state
   machine + level curve (the HUD only renders it). `server/config.js`, `server/stats.js` - config.json, XP file.
 - `web/` - plain ES modules, no build step: `index.html` HUD (`app.js`, `hud.css`, `theme.css`,
-  `i18n.js`, `narrate.js`, `stations.js`), `debug.html` raw event list.
+  `i18n.js`, `narrate.js`, `stations.js`, `labels.js`, `palette.js`), `debug.html` raw event list.
+  3D scene in `web/scene/`: `realm.js` (renderer, camera, bloom, loop), `world.js` (platforms, pipes,
+  lights), `props.js` (stations), `character.js`, `kit.js` (shared materials, textures, helpers).
 - Local files (gitignored): `config.json` (see `config.example.json`), `data/stats.json` (XP).
 
 ## Hard rules

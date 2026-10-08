@@ -13,6 +13,10 @@ import { loadStats, createStatsWriter } from './stats.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const WEB_DIR = path.join(ROOT, 'web');
+// three.js is served from node_modules (no bundler). Only its ES module folders are reachable.
+const THREE_DIR = path.join(ROOT, 'node_modules', 'three');
+const THREE_PREFIX = '/vendor/three/';
+const THREE_PARTS = [path.join(THREE_DIR, 'build') + path.sep, path.join(THREE_DIR, 'examples', 'jsm') + path.sep];
 // Env overrides let tests run a second server without touching the user's config or stats.
 const CONFIG_FILE = path.resolve(ROOT, process.env.AGENT_OFFICE_CONFIG || 'config.json');
 const DATA_DIR = path.resolve(ROOT, process.env.AGENT_OFFICE_DATA || 'data');
@@ -120,12 +124,18 @@ function handleEvent(req, res) {
 async function serveStatic(pathname, res) {
   let rel;
   try {
-    rel = pathname === '/' ? 'index.html' : decodeURIComponent(pathname).replace(/^\/+/, '');
+    rel = pathname === '/' ? 'index.html' : decodeURIComponent(pathname);
   } catch {
     return sendText(res, 400, 'Bad path');
   }
-  const file = path.resolve(WEB_DIR, rel);
-  if (!file.startsWith(WEB_DIR + path.sep)) return sendText(res, 404, 'Not found');
+  let file;
+  if (rel.startsWith(THREE_PREFIX)) {
+    file = path.resolve(THREE_DIR, rel.slice(THREE_PREFIX.length));
+    if (!file.endsWith('.js') || !THREE_PARTS.some((dir) => file.startsWith(dir))) return sendText(res, 404, 'Not found');
+  } else {
+    file = path.resolve(WEB_DIR, rel.replace(/^\/+/, ''));
+    if (!file.startsWith(WEB_DIR + path.sep)) return sendText(res, 404, 'Not found');
+  }
   try {
     const data = await fs.readFile(file);
     res.writeHead(200, {

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { LANGS, keysOf, makeTranslator } from '../web/i18n.js';
 import { logEntry, activityParts, formatDuration } from '../web/narrate.js';
-import { activeStations } from '../web/stations.js';
+import { STATIONS, activeStations } from '../web/stations.js';
 
 const text = (parts) => parts.map((p) => (typeof p === 'string' ? p : p.v)).join('');
 
@@ -91,4 +91,13 @@ test('active stations', () => {
   assert.deepEqual([...activeStations({ ...base, status: 'idle' })], ['arcade']);
   assert.deepEqual([...activeStations({ ...base, helpers: ['Explore'] })], ['portal']);
   assert.equal(activeStations(null).size, 0);
+});
+
+test('station labels: valid modes, fallback slots, names in every language', () => {
+  for (const station of STATIONS) {
+    assert.ok(['always', 'active', 'never'].includes(station.label), station.key);
+    // Labels that are always shown need a fixed slot for when the 3D scene is unavailable.
+    if (station.label === 'always') assert.equal(station.slot?.length, 2, station.key);
+    for (const lang of LANGS) assert.ok(keysOf(lang).includes(`station.${station.key}`), `${lang} ${station.key}`);
+  }
 });
