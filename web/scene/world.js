@@ -3,7 +3,7 @@
 // Layout follows docs/DESIGN.md section 4 (station placement from the original reference image).
 
 import * as THREE from 'three';
-import { P, MAT, rng, neon, platform, chamferOutline, pipeGeometries, merged, setGlow } from './kit.js';
+import { P, MAT, rng, neon, platform, chamferOutline, pipeGeometries, merged, setGlow, freeze } from './kit.js';
 
 /** Platforms by name, so props can be placed on them. `top` = floor height. */
 // Rims are thin accent lines drawn below the bloom threshold (light is information, D50); the slit
@@ -37,6 +37,7 @@ export function buildWorld(scene, drive) {
   group.add(cables());
   const { lights, ambient } = addLights(scene);
   ticks.push(alertRims(slabs, drive));
+  freeze(group); // nothing in it moves (the alert rims only show and hide)
 
   // The camera frames the main platform (realm.js); the others may run off the window edges.
   const m = PLATFORMS.main;

@@ -127,7 +127,7 @@ Must also work down to 420 px wide. Nothing scrolls; the log scrolls inside itse
   Oku, Ara, Düzenle, Komut, Web, İzin ("İzin Bekliyor" while waiting).
 - **Settings panel** (gear, `web/settings.js`, D46-D48): an ink panel with a hairline border under
   the gear; groups: names (agent name, title, subtitle, language), accent colour (6 presets + any
-  colour), sky (clock / dawn / day / dusk / night), 3D graphics (bloom, pixel ratio, measured fps),
+  colour), sky (clock / dawn / day / dusk / night), 3D graphics (bloom, pixel ratio, max frame rate, measured fps),
   bars (context window auto / 200k / 1M, time bar scale).
 - **Level up** (D56): when the XP crosses a level, a centred banner "Level up · LV n" (gold small caps
   over a big bone number, thin gold lines growing out to the sides) shows for ~3.4 s, the level badge
@@ -191,11 +191,14 @@ is 16 % darker (the arcade stands out); standby and StopFailure dim it further (
 
 Performance: `renderer.setPixelRatio(Math.min(devicePixelRatio, cap))` (default cap 1.5), stop the
 loop on `document.hidden`, bloom toggle (UnrealBloomPass, half-res), shared materials, instanced
-LEDs/particles, no shadows, frames closer than 1000/75 ms are skipped (60 Hz draws every frame,
-120/144 Hz draw 60/72). MSAA on the bloom target only below pixel ratio 1.5. Target 60 fps on
-integrated GPUs with the default settings (measured on Intel UHD, see PROGRESS session 3).
-Settings: `bloom`, `pixelRatioCap` in config.json, changed from the settings panel (URL `?bloom` / `?pr`
-override them for one tab).
+LEDs/particles, no shadows, static parts merged per material with frozen matrices, single-pass
+transparent sheets. Frame pacing (D67): 60 fps only while something travels across the screen (a
+walk to another station, level-up burst, shooting star), 30 fps during a session, 15 fps in standby
+and after a quiet minute at the end of a turn (120/144 Hz screens draw at most ~72). MSAA on the
+bloom target only below pixel ratio 1.5. No endless CSS animation while working (it would make the
+browser compose at the screen rate); only alerts (waiting, error, offline) blink.
+Settings: `bloom`, `pixelRatioCap`, `maxFps` (60 / 30) in config.json, changed from the settings panel
+(URL `?bloom` / `?pr` / `?fps` override them for one tab).
 
 Decoration vs data: the board's and the editor's "code" is coloured bars only (no characters or
 numbers; the `</>` sign and the floating `{ }` `( )` `;` bits are symbols, not text); the only

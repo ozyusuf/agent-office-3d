@@ -18,6 +18,7 @@ export const DEFAULTS = Object.freeze({
   sessionBarMinutes: 120, // session length that fills the time bar
   bloom: true, // glow post-processing in the 3D scene (off = faster on weak GPUs)
   pixelRatioCap: 1.5, // max device pixel ratio the 3D scene renders at
+  maxFps: 60, // most frames per second the 3D scene draws (it draws fewer while calm, D67)
   accentColor: '#33b7de', // replaces the neon cyan in the HUD and the 3D scene (default = measured cyan)
   sky: 'clock', // the realm's sky: follows the local time, or stays at dawn / day / dusk / night
 });
@@ -43,6 +44,7 @@ const RULES = {
   sessionBarMinutes: int(5, 24 * 60),
   bloom: bool,
   pixelRatioCap: num(0.5, 3),
+  maxFps: (v) => v === 30 || v === 60,
   accentColor: (v) => typeof v === 'string' && /^#[0-9a-f]{6}$/.test(v),
   sky: (v) => SKIES.includes(v),
 };

@@ -228,7 +228,9 @@ button { font: inherit; color: inherit; }
 .status .tools:not(:empty)::before { content: "·"; margin-right: 7px; }
 .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); }
 .status[data-state="working"] { color: var(--text); }
-.status[data-state="working"] .dot { background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); animation: breathe 2.4s ease-in-out infinite; }
+/* A still halo: an endless CSS animation would make the browser compose the whole window at the
+   screen's refresh rate for as long as the agent works, whatever the 3D scene's frame rate (D67). */
+.status[data-state="working"] .dot { background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 .status[data-state="idle"] .dot { background: var(--text-dim); }
 .status[data-state="waiting"] { color: var(--warn-yellow); }
 .status[data-state="waiting"] .dot { background: var(--warn-yellow); animation: blink 1s ease-in-out infinite; }
@@ -518,7 +520,6 @@ button { font: inherit; color: inherit; }
 .save-status[data-kind="offline"] { color: var(--warn-yellow); }
 
 @keyframes blink { 50% { opacity: 0.3; } }
-@keyframes breathe { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 6%, transparent); } }
 
 /* Short windows: a shorter log leaves more room for the scene. */
 @media (max-height: 820px) {

@@ -1,10 +1,12 @@
 # Progress
 
 ## Current state
-- **Stage 6 done on this machine** (2026-10-09): installer, README, guide, real screenshots,
-  Windows-only note, Code Editor station (D63), livelier character (D64); fresh clone from GitHub
-  installs by the README alone, shortcuts work also in Unicode / bracket folders (D66).
-  Open: an install on another physical Windows machine; a real log-in; no GIF (optional).
+- **Stage 7 (performance) done** (2026-10-09, D67): frame pacing 60 / 30 / 15 fps by what moves,
+  single-pass transparent sheets, static world merged, no per-frame forced layout, still status
+  halo, `maxFps` setting (60 / 30). CPU (renderer + GPU process) -35 to -65 % in every state.
+- Stage 6 done: installer, README, guide, screenshots, Code Editor (D63), livelier character (D64),
+  Unicode-safe shortcuts (D66). The user's friend installed it on another Windows machine: works.
+  Open: a real log-in with the login shortcut; no GIF (optional).
 - Run: `npm install`, `npm start`, open http://127.0.0.1:7847 (HUD) or /debug.html (raw events).
   Restart the server after pulling new server code (an old `node server/index.js` keeps running
   the old code). `?hour=0..24` fixes the sky's time for one tab.
@@ -12,6 +14,38 @@
   in `data/stats.json` (gitignored).
 
 ## Session log (newest first)
+
+### 2026-10-09 - Session 8 - Stage 7 (performance, user request)
+**Done**
+- The user: install on a friend's Windows machine works; the 3D view feels heavy on the CPU.
+- Harness (scratchpad, not in the repo): scratch server (port 7863, scratch config/data) + headless
+  Edge over the DevTools protocol; CPU time per process (`SystemInfo.getProcessInfo`), rendered
+  frames and draw calls (WebGL wrapped), main-thread metrics, CPU profile; scenarios standby / idle /
+  idle after a quiet minute / busy (raw hook JSON every 1.5 s). The old version ran side by side
+  from a git worktree of HEAD. Test events only went to the scratch server.
+- Found: ~55-60 fps in every state; three.js re-checked ~24 shader programs per frame (transparent
+  DoubleSide materials are drawn twice); the label layer forced a layout per frame; the status dot's
+  endless CSS animation kept the browser composing at the screen rate while working.
+- Fixed (D67): frame pacing (`paceOf` / `frameGap`), `forceSinglePass`, `freeze()` (static world and
+  decor merged per material, matrices frozen), cached label rect, still halo, `maxFps` setting
+  (config, panel "Max frame rate 60 / 30", `?fps=`), the fps line shows the pace (full rate / calm /
+  resting). README troubleshooting line for CPU use.
+- Numbers (% of one core, renderer + GPU process, 600x1000, default settings), old -> new:
+  standby 69 -> 24, idle 78 -> 48, idle after a quiet minute 78 -> 37, busy 158 -> 117.
+- Checks: pixel diff old vs new at noon and night (only animated parts differ), settings panel
+  screenshot, "30" click saves `maxFps: 30` and survives a restart, no console errors, 98 tests pass.
+
+**Left:** optional GIF (D62).
+
+**Known issues / open questions**
+- Numbers come from headless Edge (rAF at 165 Hz, so "60 / 30 / 15" show as ~55 / 33 / 15); a
+  real 60 Hz window should draw 60 / 30 / 15. The user's own feel on their laptop is the real test.
+- The user's running server (login shortcut) still has the old config validation: restart it, or
+  the new frame-rate setting is refused when saved.
+- Station meshes are not merged (their parts move and light up one by one).
+
+**Next step:** the user tries it; if the CPU is still high, set Max frame rate 30 / bloom off and
+report the fps line from the settings panel.
 
 ### 2026-10-09 - Session 7 - Stage 6 (fresh-clone install, shortcuts)
 **Done**

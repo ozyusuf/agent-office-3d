@@ -236,6 +236,8 @@ export function buildCharacter({ calm = false } = {}) {
     },
     /** The pose it is in now ('walk' while walking to another spot). */
     pose: () => (moving && !strolling ? 'walk' : goal.pose),
+    /** Walking at all, a stroll between two stands included. */
+    walking: () => moving,
     setGoal(next) {
       goal = next;
       if (next.spot === heading) {

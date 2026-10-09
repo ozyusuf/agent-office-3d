@@ -9,6 +9,7 @@
   "sessionBarMinutes": 120,
   "bloom": true,
   "pixelRatioCap": 1.5,
+  "maxFps": 60,
   "accentColor": "#33b7de",
   "sky": "clock"
 }

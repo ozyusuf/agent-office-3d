@@ -6,7 +6,7 @@
 // station works. Anything that changes at runtime has a material of its own (`neon(..., { own })`).
 
 import * as THREE from 'three';
-import { P, TAU, FACE_CAMERA, rng, neon, solid, MAT, TEX, pipeGeometries, merged, glowSprite, flatRing, setGlow, live, liveCss, lamp, brighten } from './kit.js';
+import { P, TAU, FACE_CAMERA, rng, neon, solid, MAT, TEX, pipeGeometries, merged, glowSprite, flatRing, setGlow, live, liveCss, lamp, brighten, freeze } from './kit.js';
 import { PLATFORMS } from './world.js';
 
 const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -42,7 +42,7 @@ export function buildProps(scene, camera, drive) {
   add('falls', dataFalls(drive));
   add('portal', portals(drive));
   add('arcade', arcade(drive));
-  add('decor', decor());
+  add('decor', { group: freeze(decor().group) });
   ticks.push(sputters(scene, cores, drive));
   return { anchors, cores, hovers, ticks, bounds };
 }

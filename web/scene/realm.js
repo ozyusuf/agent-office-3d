@@ -2,7 +2,8 @@
 // link from the session state to the scene (docs/DESIGN.md section 5): every frame the director
 // decides what should happen, and `drive` eases towards it so every change is a smooth transition.
 // Performance (docs/DESIGN.md): pixel-ratio cap, no shadows, shared materials, bloom can be turned
-// off, at most ~60 fps, and nothing is drawn while the tab is hidden.
+// off, 60 fps only while something travels across the screen and fewer frames otherwise (D67), and
+// nothing is drawn while the tab is hidden.
 
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -18,16 +19,13 @@ import { createEffects } from './effects.js';
 import { mixHex } from './daylight.js';
 import { P, ease, trackAccent, setAccent } from './kit.js';
 import { accentPair } from '../palette.js';
-import { createDirector, eventRate, fallsSpeed, rackTarget, powerOf, alertOf, RATE_WINDOW_MS } from './director.js';
+import { createDirector, eventRate, fallsSpeed, rackTarget, powerOf, alertOf, paceOf, frameGap, PACE_FPS, RATE_WINDOW_MS } from './director.js';
 import { stationForKind } from '../stations.js';
 import { contextFill } from '../context.js';
 
 const ELEVATION = THREE.MathUtils.degToRad(35); // camera looks down 35°
 const YAW = Math.PI / 4; // and from 45° (+x +z), so axis-aligned platforms read as diamonds
 const DISTANCE = 60;
-// Skip display frames that come sooner than this: 120/144 Hz screens draw at 60/72 fps, while a
-// 60 Hz screen (whose frames arrive with a little jitter) still draws every frame.
-const MIN_FRAME_MS = 1000 / 75;
 // Framing inside the HUD's free middle area: the main platform takes at most this share of its
 // width, and the scene from the top portal down to the lower data-fall basin at most this share of
 // its height. Side platforms may run off the window edges, as in the reference image.
@@ -39,7 +37,7 @@ const GLANCE_AT = ['centrifuge', 'orbit', 'portal', 'racks']; // first busy one 
 
 /**
  * @param {HTMLElement} container  full-window element that receives the canvas
- * @param {{ bloom?: boolean, pixelRatioCap?: number, getViewRect: () => DOMRect, onFrame?: () => void }} options
+ * @param {{ bloom?: boolean, pixelRatioCap?: number, maxFps?: number, getViewRect: () => DOMRect, onFrame?: () => void }} options
  */
 export function createRealm(container, options) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -86,6 +84,12 @@ export function createRealm(container, options) {
   const effects = createEffects(scene, { calm });
   const ticks = [...world.ticks, ...props.ticks, character.tick, helpers.tick, ...sky.ticks, effects.tick];
   trackAccent(scene); // everything built in the base cyan follows the accent colour from now on
+  // three draws a transparent double-sided material twice (back faces, then front faces) and
+  // re-checks its shader program both times, every frame. Every such part here is a flat sheet
+  // without depth writes, so a single pass looks the same.
+  scene.traverse((obj) => {
+    if (obj.material?.side === THREE.DoubleSide) obj.material.forceSinglePass = true;
+  });
 
   const anchors = { ...props.anchors, character: new THREE.Vector3() };
   character.headWorld(anchors.character);
@@ -93,6 +97,7 @@ export function createRealm(container, options) {
   let focus = null; // the server's focus session
   let config = {}; // contextWindow / contextBarMax: how full the context is (rack LEDs)
   const times = []; // hook times of recent events, for the activity rate
+  let lastEventAt = 0; // epoch ms of the latest event (frame pacing)
 
   /** Session state -> drive values (eased), character goal, exposure and station lights. */
   function direct(dt) {
@@ -240,6 +245,9 @@ export function createRealm(container, options) {
   // ---- Loop ----
 
   let running = false;
+  let maxFps = options.maxFps ?? PACE_FPS.active;
+  let pace = 'calm';
+  let gap = 0; // ms until the next frame may be drawn
   let last = 0;
   let elapsed = 0;
   let frames = 0;
@@ -247,7 +255,7 @@ export function createRealm(container, options) {
   let fps = 0;
 
   function render(now) {
-    if (now - last < MIN_FRAME_MS) return;
+    if (now - last < gap) return;
     const dt = Math.min((now - last) / 1000, 0.1); // no jump after a pause
     last = now;
     elapsed += dt;
@@ -258,6 +266,10 @@ export function createRealm(container, options) {
     if (bloom) composer.render(dt);
     else renderer.render(scene, camera);
     options.onFrame?.();
+    // How soon to draw the next frame (D67).
+    const travelling = character.pose() === 'walk' || effects.busy() || sky.busy();
+    pace = paceOf(focus, { travelling, strolling: character.walking(), quietMs: Date.now() - lastEventAt });
+    gap = frameGap(Math.min(maxFps, PACE_FPS[pace]));
     frames++;
     if (now - fpsWindow >= 1000) {
       fps = Math.round((frames * 1000) / (now - fpsWindow));
@@ -307,10 +319,13 @@ export function createRealm(container, options) {
       times.length = 0;
       for (const e of events) times.push(e.hookTs);
       times.sort((a, b) => a - b);
+      lastEventAt = times.at(-1) ?? 0;
     },
     /** A live event: short reactions that the state alone does not show. */
     onEvent(e) {
       times.push(e.hookTs);
+      lastEventAt = Date.now();
+      gap = 0; // react on the next display frame
       director.note(e, Date.now());
       if (e.event === 'PostToolUseFailure') {
         // The station sputters out: it drops dark at once and flickers red.
@@ -354,9 +369,14 @@ export function createRealm(container, options) {
       pixelRatioCap = cap;
       frame();
     },
+    /** Frame-rate setting: the most frames per second the scene draws (60 or 30). */
+    setMaxFps(value) {
+      maxFps = value;
+      gap = 0;
+    },
     stats() {
       return {
-        fps, running, bloom, pixelRatio: renderer.getPixelRatio(),
+        fps, pace, running, bloom, pixelRatio: renderer.getPixelRatio(),
         drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles,
       };
     },

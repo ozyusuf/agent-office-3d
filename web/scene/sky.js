@@ -365,6 +365,8 @@ export function buildSky(scene, camera, { hour = () => null, calm = false } = {}
     setStorm(value) {
       storm = value;
     },
+    /** A shooting star is crossing (the realm draws at full rate meanwhile). */
+    busy: () => shot !== null,
     /** Lightning brightness right now (realm.js lifts the exposure with it). */
     flash: () => flash * storm,
     /** A shooting star across the upper sky (only when stars are out). */

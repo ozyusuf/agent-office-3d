@@ -24,9 +24,10 @@ const view = {
   events: [], // recent events for the log
   lang: langFromUrl(), // ?lang= for this tab only; otherwise config.language
   multiSession: false,
-  // 3D quality for this tab only (?bloom=0|1&pr=1|1.5|2); otherwise config.json
+  // 3D quality for this tab only (?bloom=0|1&pr=1|1.5|2&fps=30|60); otherwise config.json
   bloom: fromUrl('bloom', (v) => (v === '1' ? true : v === '0' ? false : null)),
   pixelRatioCap: fromUrl('pr', (v) => (Number(v) >= 0.5 && Number(v) <= 3 ? Number(v) : null)),
+  maxFps: fromUrl('fps', (v) => (v === '30' || v === '60' ? Number(v) : null)),
   hour: fromUrl('hour', (v) => (v !== '' && Number(v) >= 0 && Number(v) < 24 ? Number(v) : null)), // fixed sky time
 };
 let t = makeTranslator(view.lang ?? 'en');
@@ -328,10 +329,11 @@ function cfg() {
 /** The effective config changed (an edit in this tab, or a save from any tab): apply it live. */
 function applyConfig(keys, byUser) {
   if (byUser) {
-    // A choice made in the panel replaces this tab's URL override (?lang, ?bloom, ?pr).
+    // A choice made in the panel replaces this tab's URL override (?lang, ?bloom, ?pr, ?fps).
     if (keys.includes('language')) view.lang = null;
     if (keys.includes('bloom')) view.bloom = null;
     if (keys.includes('pixelRatioCap')) view.pixelRatioCap = null;
+    if (keys.includes('maxFps')) view.maxFps = null;
   }
   if (view.hud) realm?.setState(view.hud, cfg()); // the context window drives the rack LEDs
   if (keys.includes('sky')) realm?.refreshSky();
@@ -377,6 +379,7 @@ function quality() {
   return {
     bloom: view.bloom ?? cfg().bloom ?? true,
     pixelRatioCap: view.pixelRatioCap ?? cfg().pixelRatioCap ?? 1.5,
+    maxFps: view.maxFps ?? cfg().maxFps ?? 60,
   };
 }
 
@@ -384,6 +387,7 @@ function applyQuality() {
   const q = quality();
   realm?.setBloom(q.bloom);
   realm?.setPixelRatioCap(q.pixelRatioCap);
+  realm?.setMaxFps(q.maxFps);
   renderQuality();
 }
 
@@ -391,7 +395,7 @@ function renderQuality() {
   renderSettings();
   $('set-3d').hidden = !realm;
   const stats = realm?.stats();
-  $('fps').textContent = !realm ? t('noScene') : stats.running ? t('fps', { fps: stats.fps, calls: stats.drawCalls }) : '';
+  $('fps').textContent = !realm ? t('noScene') : stats.running ? t('fps', { fps: stats.fps, pace: t(`pace.${stats.pace}`), calls: stats.drawCalls }) : '';
 }
 
 async function startScene() {

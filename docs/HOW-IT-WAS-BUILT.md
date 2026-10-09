@@ -121,8 +121,12 @@ Claude Code hooks -> hooks/send-event.ps1 -> POST /event -> Node server -> WebSo
 - **Where vs. how** (D64): the events decide *where* the character is; *how* it spends the time
   there (moving between a few stands, fidgets, glances at busy stations) is decoration in `life.js`,
   so the character never freezes in the middle of a station without inventing any session data.
-- **Performance** (D31): pixel ratio cap, no shadows, instanced meshes, a frame cap, the loop stops
-  while the tab is hidden, bloom can be turned off. Measured on an Intel UHD iGPU.
+- **Performance** (D31, D67): pixel ratio cap, no shadows, instanced meshes, the loop stops while the
+  tab is hidden, bloom can be turned off. Measured on an Intel UHD iGPU. Later a measuring harness
+  (headless Edge driven over the DevTools protocol, CPU time per browser process) showed the real
+  costs: a monitor that is always visible should draw only the frames its motion needs (60 / 30 /
+  15 fps by what moves), three.js draws transparent double-sided materials twice and re-checks their
+  shaders every frame, and one endless CSS animation keeps the browser composing at the screen rate.
 
 ## 3. The stages
 
@@ -136,6 +140,7 @@ Claude Code hooks -> hooks/send-event.ps1 -> POST /event -> Node server -> WebSo
 | 5 | Settings panel, live re-tint of accent colour | All-or-nothing validation, atomic writes (D46, D47) |
 | Redesign | "Light is information", the sky realm, real context tokens | D49-D57 |
 | 6 | Installer, uninstaller, shortcuts, README, this guide | Diff + backup + explicit "y" (D58) |
+| 7 | Performance: frame pacing, fewer draw calls, frame-rate setting | Measured first, CPU -35 to -65 % (D67) |
 
 ## 4. Facts about Claude Code hooks that we verified
 

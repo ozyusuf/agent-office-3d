@@ -416,3 +416,30 @@ for `[x]`, so `start.ps1` starts programs through `ProcessStartInfo`, uses `-Lit
 any unexpected error in a message box when run from a shortcut instead of exiting without a word.
 Checked: install, both shortcuts, hook in exec form, uninstall (byte-exact restore) in an ASCII
 folder and in the Unicode + brackets folder; shortcuts made by the old version are still removed.
+
+
+**D67. The scene draws only as many frames as its motion needs (stage 7, 2026-10-09).** The user
+found the 3D view heavy on the CPU; it sits next to the editor all day and is never focused, so
+`document.hidden` rarely helps. Measured with a harness (scratch server + headless Edge + DevTools
+protocol: CPU time per process, rendered frames, draw calls, CPU profile), it drew ~55-60 fps in
+every state and used ~0.7 cores in standby, ~1.6 while working (renderer + GPU process). Changes:
+- *Pacing* (`paceOf` / `frameGap` in director.js): 60 fps only while something travels across the
+  screen (a walk to another station, a level-up burst, a shooting star); 30 fps during a session
+  (typing, spinning stations, strolls, clouds, falls and the storm's rain look the same); 15 fps in
+  standby and once a finished turn had no event for a minute. A live event draws the next frame at
+  once. New setting `maxFps` (60 / 30, panel "3D graphics", URL `?fps=`) lowers every pace.
+- *Shader churn*: three.js draws a transparent `DoubleSide` material twice (back, then front faces)
+  and re-evaluates its program both times, every frame (~24 `getProgram` calls per frame, the largest
+  item in the profile). All such parts are flat sheets without depth writes, so realm.js sets
+  `forceSinglePass` on them: same picture, ~12 fewer draws and no per-frame program checks.
+- *Static parts* (`freeze()` in kit.js): the world (platforms, rocks, pipes, cables) and the decor
+  merge opaque meshes that share a material (-11 draw calls) and compute their matrices once. Pixel
+  diff against the old version: only the animated parts differ.
+- *DOM*: the label layer no longer reads the middle area's rectangle every frame (a forced layout);
+  it is measured on resize. The status dot's breathing halo is still now: an endless CSS animation
+  makes the browser compose the whole window at the screen's refresh rate for as long as the agent
+  works, whatever the scene's frame rate (~15 % of the working-state CPU).
+Result (same machine, i7-11800H + Intel UHD, 600x1000, default settings, % of one core, renderer +
+GPU process): standby 69 -> 24, idle after a turn 78 -> 48, idle after a quiet minute 78 -> 37,
+busy session (a tool call every 1.5 s, many walks) 158 -> 117. Not done: merging station meshes
+(their parts move and light up one by one), lower calm rates (strolls and rain look choppy at 15).

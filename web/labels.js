@@ -21,6 +21,12 @@ export function createLabelLayer(layer, middle) {
   let shownLast = new Set(); // labels placed in the previous update
   let lastUpdate = 0;
   let realm = null;
+  // The free middle area, measured only when it changes: reading it every frame would force a
+  // layout right after the labels moved.
+  let rect = middle.getBoundingClientRect();
+  const measure = () => { rect = middle.getBoundingClientRect(); };
+  new ResizeObserver(measure).observe(middle);
+  window.addEventListener('resize', measure);
 
   // Leader lines live in one SVG under the labels.
   const svg = document.createElementNS(SVG_NS, 'svg');
@@ -84,7 +90,6 @@ export function createLabelLayer(layer, middle) {
     lastUpdate = now;
     const scale = realm ? Math.min(1, Math.max(MIN_SCALE, realm.pixelsPerUnit() / FULL_SIZE_PPU)) : 1;
     // The free middle area: labels stay inside it (the HUD has no boxes to hide them behind).
-    const rect = middle.getBoundingClientRect();
     area.top = rect.top;
     area.bottom = rect.bottom;
     const items = [];
@@ -174,7 +179,7 @@ export function createLabelLayer(layer, middle) {
       item.el.style.transform = transform;
       written.set(item.el, transform);
     }
-    item.el.dataset.placed = '';
+    if (!('placed' in item.el.dataset)) item.el.dataset.placed = '';
   }
 
   window.addEventListener('resize', () => realm || update());

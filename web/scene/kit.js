@@ -167,6 +167,37 @@ export function setAccent({ main, soft }) {
   for (const target of accentTargets) recolor(target);
 }
 
+/**
+ * Parts that never move: opaque meshes that share a material are merged into one mesh (one draw
+ * call each), and every matrix is computed once instead of every frame. Only for groups whose
+ * meshes are never changed one by one afterwards.
+ */
+export function freeze(root) {
+  root.updateMatrixWorld(true);
+  const toRoot = root.matrixWorld.clone().invert();
+  const byMaterial = new Map();
+  root.traverse((obj) => {
+    const g = obj.geometry;
+    if (!obj.isMesh || obj.isInstancedMesh || obj.children.length || !obj.visible || Array.isArray(obj.material)) return;
+    if (obj.material.transparent || g.groups.length || obj.matrixWorld.determinant() < 0) return;
+    const key = [obj.material.uuid, ...Object.entries(g.attributes).map(([name, a]) => `${name}${a.itemSize}${a.normalized}`).sort()].join('|');
+    if (!byMaterial.has(key)) byMaterial.set(key, []);
+    byMaterial.get(key).push(obj);
+  });
+  const local = new THREE.Matrix4();
+  for (const meshes of byMaterial.values()) {
+    if (meshes.length < 2) continue;
+    const geos = meshes.map((mesh) => mesh.geometry.clone().applyMatrix4(local.multiplyMatrices(toRoot, mesh.matrixWorld)));
+    root.add(merged(geos, meshes[0].material));
+    for (const mesh of meshes) mesh.removeFromParent();
+  }
+  root.traverse((obj) => {
+    obj.updateMatrix();
+    obj.matrixAutoUpdate = false;
+  });
+  return root;
+}
+
 /** Moves `value` towards `target`: about 63 % of the way every `tau` seconds (frame-rate independent). */
 export function ease(value, target, dt, tau) {
   return value + (target - value) * (1 - Math.exp(-dt / tau));

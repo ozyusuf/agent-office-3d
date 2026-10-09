@@ -69,7 +69,8 @@ from the new place. Running it twice is safe; it only adds what is missing.
 - **Stop:** `powershell -ExecutionPolicy Bypass -File scripts\stop.ps1` (or Ctrl+C in the `npm start`
   window). When the server is not running the hook exits at once and Claude Code is not affected.
 - **Settings:** the gear icon at the top right: agent name, title, language (English / Turkish),
-  accent colour, sky (your clock, or a fixed dawn / day / dusk / night), 3D quality, context window.
+  accent colour, sky (your clock, or a fixed dawn / day / dusk / night), 3D quality (bloom, pixel
+  ratio, max frame rate), context window.
   Changes apply at once in every open tab and are saved to `config.json`.
 - **Port:** 7847 by default. To change it, put `"port": 7848` in `config.json` (see
   `config.example.json`) and restart the server; the hook reads the same file.
@@ -104,6 +105,9 @@ view shows. Your level (XP) is stored in `data/stats.json`.
   contain `"disableAllHooks": true`, no hook runs.
 - **"Waiting for permission" stays on after you deny a request.** Claude Code fires no hook when a
   permission is denied in its dialog, so the monitor learns about it only with the next event.
+- **The monitor uses too much CPU or makes the fan spin.** The scene already draws fewer frames when
+  little moves (30 fps during a session, 15 when idle). In the settings set *Max frame rate* to 30,
+  turn *Bloom* off or set *Pixel ratio* to 1×; minimising the window stops the scene completely.
 - **Port already in use.** Another program uses 7847: set another `port` in `config.json`.
 - **The shortcut shows a message instead of the monitor.** The message says why (Node.js missing,
   packages missing, port taken); the server's own output is in `data\server.log`. If you moved the

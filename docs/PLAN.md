@@ -83,3 +83,15 @@ stop) plays out visibly on screen with correct stations and no stuck states.
 - [x] Cross-platform note: hook script for macOS/Linux (sh/curl) or document Windows-only (D61)
 
 **Done when:** a fresh clone can be installed on another Windows machine by following only the README.
+
+## Stage 7 - Performance (user request after stage 6)
+- [x] Measuring harness: scratch server + headless Edge, CPU time per process, frames, draw calls, profile
+- [x] Frame pacing: 60 fps only while something travels, 30 during a session, 15 in standby / at rest (D67)
+- [x] No per-frame shader checks for transparent double-sided sheets (`forceSinglePass`)
+- [x] Static world and decor merged per material, matrices frozen
+- [x] No forced layout per frame in the label layer; no endless CSS animation while working
+- [x] `maxFps` setting (60 / 30) in config, settings panel and `?fps=`
+- [x] Before/after numbers on the same machine; pixel diff of the static scene
+
+**Done when:** the scene's CPU use is clearly lower in every state on the same machine, with the same
+picture and no new console errors.

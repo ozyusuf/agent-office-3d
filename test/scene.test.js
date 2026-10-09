@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SPOTS, RING_R, FRAMES, planPath, pathLength, floorAt, spotPoint } from '../web/scene/walk.js';
 import { roams, animFor, nextStand, dwell, pickFidget, fidgetGap, envelope, GESTURE_S } from '../web/scene/life.js';
-import { createDirector, eventRate, fallsSpeed, rackTarget, powerOf, alertOf, LINGER_MS, HOLD_MS } from '../web/scene/director.js';
+import { createDirector, eventRate, fallsSpeed, rackTarget, powerOf, alertOf, paceOf, frameGap, PACE_FPS, REST_AFTER_MS, LINGER_MS, HOLD_MS } from '../web/scene/director.js';
 
 // ---- Walking ----
 
@@ -228,4 +228,33 @@ test('derived values: rate, falls, racks, power, alert', () => {
   assert.equal(powerOf(focusOf({ status: 'idle' })), 1);
   assert.equal(alertOf(focusOf({ status: 'error' })), 1);
   assert.equal(alertOf(focusOf()), 0);
+});
+
+// ---- Frame pacing (D67) ----
+
+test('full rate only while something travels; calm in a session, standby without one or at rest', () => {
+  const still = { travelling: false, strolling: false, quietMs: 1000 };
+  const rested = { ...still, quietMs: REST_AFTER_MS + 1 };
+  assert.equal(paceOf({ status: 'working' }, { ...still, travelling: true }), 'active');
+  assert.equal(paceOf(null, { ...rested, travelling: true }), 'active');
+  for (const status of ['working', 'waiting', 'idle', 'error']) assert.equal(paceOf({ status }, still), 'calm');
+  // A finished turn rests after a quiet minute, unless the character strolls; a long tool call does not.
+  assert.equal(paceOf({ status: 'idle' }, rested), 'standby');
+  assert.equal(paceOf({ status: 'idle' }, { ...rested, strolling: true }), 'calm');
+  for (const status of ['working', 'waiting', 'error']) assert.equal(paceOf({ status }, rested), 'calm');
+  assert.equal(paceOf({ status: 'ended' }, still), 'standby');
+  assert.equal(paceOf(null, still), 'standby');
+  assert.ok(PACE_FPS.active > PACE_FPS.calm && PACE_FPS.calm > PACE_FPS.standby);
+});
+
+test('frame gaps: a 60 Hz screen draws every 1st / 2nd / 4th frame despite jitter', () => {
+  const vsync = 1000 / 60;
+  for (const [fps, every] of [[60, 1], [30, 2], [15, 4]]) {
+    const gap = frameGap(fps);
+    // A frame that comes 2 ms early is still drawn; the display frame before it is not.
+    assert.ok(every * vsync - 2 >= gap, `${fps} fps`);
+    assert.ok((every - 1) * vsync + 2 < gap, `${fps} fps`);
+  }
+  // 144 Hz: at most ~72 fps at the full rate.
+  assert.ok(frameGap(60) > 1000 / 144);
 });

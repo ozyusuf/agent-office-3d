@@ -53,6 +53,8 @@ export function createEffects(scene, { calm = false } = {}) {
       points.visible = !calm; // reduced motion: only the ring of light
       ring.visible = true;
     },
+    /** A burst is playing (the realm draws at full rate meanwhile). */
+    busy: () => started >= 0,
     tick(t, dt) {
       clock += dt;
       if (started < 0) return;

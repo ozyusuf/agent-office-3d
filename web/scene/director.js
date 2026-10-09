@@ -121,3 +121,38 @@ export function powerOf(focus) {
 export function alertOf(focus) {
   return focus?.status === 'error' ? 1 : 0;
 }
+
+// ---- Frame pacing (D67) ----
+// The realm draws at full rate only while something travels across the screen (the character
+// walking to another station, a level-up burst, a shooting star). Everything else moves slowly
+// (typing, spinning stations, strolls, clouds, falls), so a running session draws at half rate, and
+// standby or a finished turn with nothing new for a minute at a quarter: the monitor sits next to
+// the editor all day and should cost little CPU.
+
+/** Frames per second for each pace (the frame-rate setting can lower them, never raise them). */
+export const PACE_FPS = { active: 60, calm: 30, standby: 15 };
+/** A finished turn rests at the standby rate once no event came for this long. */
+export const REST_AFTER_MS = 60_000;
+
+/**
+ * @param {object|null} focus  the server's focus session
+ * @param {{ travelling: boolean, strolling: boolean, quietMs: number }} scene  travelling = a walk
+ *   to another station, a burst or a shooting star; strolling = a short walk between two stands;
+ *   quietMs = time since the last event
+ * @returns {'active' | 'calm' | 'standby'}
+ */
+export function paceOf(focus, { travelling, strolling, quietMs }) {
+  if (travelling) return 'active';
+  if (!powerOf(focus)) return 'standby';
+  if (focus.status !== 'idle' || strolling || quietMs < REST_AFTER_MS) return 'calm'; // (the storm's rain needs 30)
+  return 'standby';
+}
+
+/**
+ * Shortest time between two drawn frames for `fps`: a little under one frame time, so a 60 Hz
+ * screen whose frames arrive with some jitter still draws every frame (or every 2nd / 4th one),
+ * and 120/144 Hz screens draw at most ~72 fps.
+ */
+export function frameGap(fps) {
+  return 1000 / fps - 3.3;
+}
