@@ -75,7 +75,7 @@ stop) plays out visibly on screen with correct stations and no stuck states.
 ## Stage 6 - Install, docs, release
 - [x] Install script (PowerShell): `npm install`, back up `~/.claude/settings.json`, show the diff,
       merge hooks only after explicit confirmation; uninstall script restores the backup
-- [ ] Optional: start server on login / from a desktop shortcut
+- [x] Optional: start server on login / from a desktop shortcut (D60, D66)
 - [x] English README: what it is, screenshots, requirements, install, privacy (localhost only)
 - [x] "How it was built" guide (`docs/HOW-IT-WAS-BUILT.md`) from PROGRESS + DECISIONS
 - [ ] Screenshots / short GIF of each state (3 real screenshots so far, D62; no GIF)

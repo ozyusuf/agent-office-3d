@@ -402,3 +402,17 @@ reactions still come only from events. Reduced motion turns strolls, fidgets and
 a personal name and a third-party UI, and its origin was not recorded, so it should not be public.
 `docs/DESIGN.md` (section 4) already holds every station and its place, so nothing depends on it.
 The history was rewritten and force-pushed once, with the user's explicit request.
+
+**D66. Shortcuts are written with Shell32's link object, and the scripts never pass a folder to
+`Start-Process`.** The fresh-clone test (stage 6) installed the project under a folder with Turkish
+letters, spaces and brackets (`Kullanıcı Ğüş [x]`). `WScript.Shell` writes a shortcut's paths in the
+ANSI code page (1252 on English Windows): it could not save a shortcut into such a desktop folder at
+all, and in other folders it stored `Kullanici Güs`, so the shortcut silently ran nothing and
+the uninstaller did not recognise it. Shell32's `ShellLinkObject` keeps Unicode but only opens an
+existing shortcut, so `shortcut.ps1` first writes an empty one (the 80-byte minimum of the
+MS-SHLLINK format) and fills it from there; removal reads it the same way and compares as plain text
+(`-like` treats `[x]` as a pattern). `Start-Process` reads its working folder as a wildcard and fails
+for `[x]`, so `start.ps1` starts programs through `ProcessStartInfo`, uses `-LiteralPath`, and shows
+any unexpected error in a message box when run from a shortcut instead of exiting without a word.
+Checked: install, both shortcuts, hook in exec form, uninstall (byte-exact restore) in an ASCII
+folder and in the Unicode + brackets folder; shortcuts made by the old version are still removed.

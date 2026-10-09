@@ -25,6 +25,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
+. (Join-Path $root 'scripts\common.ps1')
 
 function Step([string]$Text) {
     Write-Host ''
@@ -59,7 +60,7 @@ if (-not $npm) {
     Write-Host 'npm was not found (it comes with Node.js). Reinstall Node.js and run this again.' -ForegroundColor Red
     exit 1
 }
-Push-Location $root
+Push-Location -LiteralPath $root
 try {
     $ErrorActionPreference = 'Continue' # npm prints notices on stderr
     & $npm.Source install --no-audit --no-fund
@@ -108,5 +109,5 @@ if ($startNow) {
 
 Write-Host ''
 Write-Host 'Done. Use Claude Code in any project and watch the monitor.' -ForegroundColor Green
-Write-Host 'Monitor: http://127.0.0.1:<port>/ (7847 unless you changed it). Remove everything: uninstall.ps1'
+Write-Host "Monitor: http://127.0.0.1:$(Get-AgentOfficePort)/   Remove everything: uninstall.ps1"
 exit 0

@@ -105,6 +105,9 @@ view shows. Your level (XP) is stored in `data/stats.json`.
 - **"Waiting for permission" stays on after you deny a request.** Claude Code fires no hook when a
   permission is denied in its dialog, so the monitor learns about it only with the next event.
 - **Port already in use.** Another program uses 7847: set another `port` in `config.json`.
+- **The shortcut shows a message instead of the monitor.** The message says why (Node.js missing,
+  packages missing, port taken); the server's own output is in `data\server.log`. If you moved the
+  folder, run `install.ps1` again so the shortcuts point at the new place.
 - **The installer stops because the settings file is not valid JSON.** Fix the file (or restore
   one of its backups) and run the installer again; nothing was changed.
 

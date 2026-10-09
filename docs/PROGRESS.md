@@ -1,9 +1,10 @@
 # Progress
 
 ## Current state
-- **Stage 6 mostly done** (2026-10-09): installer, README, guide, real screenshots, Windows-only note;
-  plus the user's follow-up: Code Editor station (D63) and a livelier character (D64).
-  Open: shortcuts and a fresh-clone install on another machine are not verified; no GIF.
+- **Stage 6 done on this machine** (2026-10-09): installer, README, guide, real screenshots,
+  Windows-only note, Code Editor station (D63), livelier character (D64); fresh clone from GitHub
+  installs by the README alone, shortcuts work also in Unicode / bracket folders (D66).
+  Open: an install on another physical Windows machine; a real log-in; no GIF (optional).
 - Run: `npm install`, `npm start`, open http://127.0.0.1:7847 (HUD) or /debug.html (raw events).
   Restart the server after pulling new server code (an old `node server/index.js` keeps running
   the old code). `?hour=0..24` fixes the sky's time for one tab.
@@ -11,6 +12,36 @@
   in `data/stats.json` (gitignored).
 
 ## Session log (newest first)
+
+### 2026-10-09 - Session 7 - Stage 6 (fresh-clone install, shortcuts)
+**Done**
+- Fresh `git clone` from GitHub into an empty folder, README steps only, against a scratch
+  settings file, scratch shortcut folders and port 7862 (the user's settings and server untouched):
+  installer diff + "y" + backup, second run changes nothing, hook run in exec form from the
+  settings entry (event arrives, no output, silent when the server is down), login shortcut starts
+  the server hidden in ~2 s, desktop shortcut starts it and opens the Edge app window, uninstall
+  restores the settings byte-exact, removes both shortcuts and stops the server.
+- Same in a folder `Kullanıcı Ğüş [x]` (Turkish letters, space, brackets) with Unicode desktop /
+  startup folders: found and fixed three bugs (D66): WScript.Shell stored ANSI-mangled paths (the
+  shortcut ran nothing, could not even be saved into a Unicode folder, uninstall left it);
+  `Start-Process` failed in a `[x]` folder; shortcut errors were silent. Now Shell32 link object
+  + an empty 80-byte .lnk, `ProcessStartInfo`, `-LiteralPath`, a message box for any error.
+  Shortcuts made by the old version are still removed.
+- Installer prints the real monitor URL; README troubleshooting line for the shortcut.
+- Tests: 96 pass (PowerShell scripts checked by hand as above).
+
+**Left:** install on another physical Windows machine; a real sign-out / sign-in with the login
+shortcut; GIF (optional, D62).
+
+**Known issues / open questions**
+- Piping answers into install.ps1 does not work (Node's prompt reads all of stdin); a real console
+  is fine. Scripted runs use `-Yes`.
+- The installer re-formats the user's settings file in Claude Code's 2-space JSON style (values
+  unchanged; the diff shows it).
+- The tests opened a few Edge app windows on 127.0.0.1:7862; the user can close them.
+
+**Next step:** `/next` -> stage 6 wrap-up: the user installs on another Windows machine following
+only the README (or confirms it is enough); then optional GIF and a v0.1.0 release tag.
 
 ### 2026-10-09 - Session 6 - Stage 6 (install, docs, release) + follow-up
 **Done**
