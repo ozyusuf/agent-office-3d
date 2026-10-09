@@ -15,8 +15,8 @@ Claude Code hooks -> local server (127.0.0.1 only) -> WebSocket -> three.js page
   machine + level curve (the HUD only renders it). `server/config.js`, `server/stats.js` - config.json, XP file.
 - `web/` - plain ES modules, no build step: `index.html` HUD (`app.js`, `hud.css`, `theme.css`,
   `i18n.js`, `narrate.js`, `stations.js`, `labels.js`, `palette.js`), `debug.html` raw event list.
-  3D scene in `web/scene/`: `realm.js` (renderer, camera, bloom, loop), `world.js` (platforms, pipes,
-  lights), `props.js` (stations), `character.js`, `kit.js` (shared materials, textures, helpers).
+  3D scene in `web/scene/`: `realm.js` (renderer, camera, bloom, loop, state -> `drive`), `director.js`
+  + `walk.js` (pure, tested), `world.js`, `props.js` (stations), `character.js`, `helpers.js`, `kit.js`.
 - Local files (gitignored): `config.json` (see `config.example.json`), `data/stats.json` (XP).
 
 ## Hard rules

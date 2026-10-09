@@ -52,14 +52,14 @@ driven by real events (verified by reading the server state), and switching lang
 stops drawing when hidden, and all labels track their stations.
 
 ## Stage 4 - Events -> animations
-- [ ] Central state machine (idle / working / waiting permission / stopped / error) fed by events
-- [ ] Character walks/turns to the active station; returns to desk when idle
-- [ ] Each row of the event -> reaction table in `DESIGN.md` implemented
-- [ ] Pair PreToolUse with PostToolUse or PostToolUseFailure by `tool_use_id`; no station stays stuck "on"
-- [ ] Subagent helpers: spawn from portal on SubagentStart, return on SubagentStop (one per `agent_id`)
-- [ ] Compaction: server racks drain; context bar resets
-- [ ] StopFailure: lights out, red alert; cleared by the next prompt
-- [ ] Smooth transitions, no work while idle beyond ambient loops
+- [x] Central state machine (idle / working / waiting permission / stopped / error) fed by events
+- [x] Character walks/turns to the active station; returns to the desk between tasks, plays at the arcade after Stop
+- [x] Each row of the event -> reaction table in `DESIGN.md` implemented
+- [x] Pair PreToolUse with PostToolUse or PostToolUseFailure by `tool_use_id`; no station stays stuck "on"
+- [x] Subagent helpers: spawn from portal on SubagentStart, return on SubagentStop (one per `agent_id`)
+- [x] Compaction: server racks drain; context bar resets
+- [x] StopFailure: lights out, red alert; cleared by the next prompt
+- [x] Smooth transitions, no work while idle beyond ambient loops
 
 **Done when:** a normal Claude Code session (read, grep, edit, bash, web, permission, subagent,
 stop) plays out visibly on screen with correct stations and no stuck states.

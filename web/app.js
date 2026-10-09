@@ -49,6 +49,7 @@ function renderAll() {
   renderCharacter();
   renderStations();
   renderSkills();
+  renderTint();
   renderLog();
 }
 
@@ -58,6 +59,13 @@ function renderLive() {
   renderCharacter();
   renderStations();
   renderSkills();
+  renderTint();
+}
+
+// Scene tint: yellow while waiting for permission, red after an API error (StopFailure).
+function renderTint() {
+  const status = view.hud?.focus?.status;
+  $('tint').dataset.state = status === 'waiting' || status === 'error' ? status : '';
 }
 
 function applyLanguage() {
@@ -349,6 +357,10 @@ async function startScene() {
       onFrame: labels.update,
     });
     labels.attach(realm);
+    if (view.hud) {
+      realm.setState(view.hud, view.config);
+      realm.seed(view.events);
+    }
     // The free middle area changes with the window and with the panels' sizes.
     new ResizeObserver(() => realm.reframe()).observe($('middle'));
   } catch (err) {
@@ -375,11 +387,15 @@ connectLive({
     view.config = data.config;
     view.hud = data.state;
     view.events = data.history.slice(-EVENTS_KEPT);
+    realm?.setState(view.hud, view.config);
+    realm?.seed(view.events);
     renderAll();
     applyQuality();
   },
   onEvent(data) {
     view.hud = data.state;
+    realm?.onEvent(data.event);
+    realm?.setState(view.hud, view.config);
     appendLog(data.event);
     renderLive();
   },

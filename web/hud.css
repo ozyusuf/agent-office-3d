@@ -21,6 +21,14 @@ button { font: inherit; color: inherit; }
 .scene { position: fixed; inset: 0; }
 .scene canvas { display: block; }
 
+/* Tint over the 3D view: yellow edges blink while waiting for permission, red pulse after an API error. */
+.tint { position: fixed; inset: 0; pointer-events: none; }
+.tint::before, .tint::after { content: ""; position: absolute; inset: 0; opacity: 0; transition: opacity 0.6s ease; }
+.tint::before { background: radial-gradient(ellipse at 50% 48%, transparent 30%, color-mix(in srgb, var(--warn-yellow) 34%, transparent) 100%); }
+.tint::after { background: radial-gradient(ellipse at 50% 48%, transparent 36%, color-mix(in srgb, var(--alert-red) 28%, transparent) 100%); }
+.tint[data-state="waiting"]::before { opacity: 1; animation: blink 1s ease-in-out infinite; }
+.tint[data-state="error"]::after { opacity: 1; animation: blink 2.4s ease-in-out infinite; }
+
 /* Labels that follow 3D anchor points (web/labels.js). Below the HUD, so glass panels cover them. */
 .labels { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
 .labels > * { position: absolute; left: 0; top: 0; transform-origin: 50% 100%; }

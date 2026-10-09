@@ -88,8 +88,10 @@ test('active stations', () => {
   const base = { status: 'working', activeKinds: [], helpers: [], compacting: null };
   assert.deepEqual([...activeStations({ ...base, activeKinds: ['edit', 'read'] })].sort(), ['board', 'smelter']);
   assert.deepEqual([...activeStations({ ...base, activeKinds: ['mcp'] })], ['desk']);
-  assert.deepEqual([...activeStations({ ...base, status: 'idle' })], ['arcade']);
-  assert.deepEqual([...activeStations({ ...base, helpers: ['Explore'] })], ['portal']);
+  assert.deepEqual([...activeStations({ ...base, status: 'idle', turnEnded: true })], ['arcade']);
+  assert.deepEqual([...activeStations({ ...base, status: 'idle', turnEnded: false })], []); // fresh session
+  assert.deepEqual([...activeStations({ ...base, helpers: [{ id: 'a1', agentType: 'Explore', kind: null }] })], ['portal']);
+  assert.deepEqual([...activeStations({ ...base, status: 'ended', activeKinds: ['read'] })], []);
   assert.equal(activeStations(null).size, 0);
 });
 

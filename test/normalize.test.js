@@ -123,3 +123,19 @@ test('tool kinds', () => {
   assert.equal(toolKind('mcp__github__create_issue'), 'mcp');
   assert.equal(toolKind('Skill'), 'other');
 });
+
+test('TodoWrite sends task counts only, never the task text', () => {
+  const e = normalize({
+    ...base,
+    hook_event_name: 'PreToolUse',
+    tool_name: 'TodoWrite',
+    tool_input: { todos: [
+      { content: 'secret plan A', status: 'completed' },
+      { content: 'secret plan B', status: 'in_progress' },
+      { content: 'secret plan C', status: 'pending' },
+    ] },
+  }, meta);
+  assert.equal(e.kind, 'task');
+  assert.deepEqual(e.todos, { total: 3, done: 1, doing: 1 });
+  assert.ok(!JSON.stringify(e).includes('secret'));
+});

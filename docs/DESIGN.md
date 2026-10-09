@@ -157,36 +157,51 @@ LEDs/particles, no shadows, frames closer than 1000/75 ms are skipped (60 Hz dra
 integrated GPUs with the default settings (measured on Intel UHD, see PROGRESS session 3).
 Settings: `bloom`, `pixelRatioCap` in config.json; the gear menu overrides them for one tab.
 
-Decoration vs data: the board's "code" is coloured bars only (no characters or numbers), rack LEDs
-stay unlit until stage 4 lights them by context fill, and ambient loops (flames, falls, rings,
-dust) carry no meaning until stage 4 ties them to events.
+Decoration vs data: the board's "code" is coloured bars only (no characters or numbers); the only
+real values in the 3D scene are the board's ticker (file name, search pattern, task chips), the
+lit rack LEDs (context fill) and the helper bots (one per running subagent). Ambient loops keep
+running at a low idle level; events speed them up.
+
+Stage 4 wiring (`web/scene/`): `director.js` turns the server snapshot (+ live events) into goals,
+`realm.js` eases a shared `drive` object towards them every frame (stations rise in ~0.2 s, settle
+back in ~1 s), stations / character / bots read `drive`. The character walks a fixed network
+(`walk.js`): a ring around the dais (r 2.15, never behind the console) plus one leg per spot:
+desk (inside the console), smelter (right of the furnace), board (in front of its right half),
+arcade (over the step on the west platform). Walks take ~1.2 s (3.2-7.5 units/s). It only follows
+the main agent's calls; it stays at a work station 2.5 s after the call ends (no running back and
+forth between calls), and every PreToolUse lights its station for at least 0.7 s, so 50 ms calls
+are still seen. Poses: stand, type, forge (hammer), present (points at the board), wave, play, slump.
 
 ## 5. Event -> reaction
 Every reaction is caused by a real event. "Pair" = matched by `tool_use_id`.
 
 | Event | Condition | 3D | HUD |
 |---|---|---|---|
-| SessionStart | any `source` | scene powers up, character appears at desk | session timer starts; state working/idle; log "Session started (source)" |
-| UserPromptSubmit | - | character faces desk, types; clears waiting/error states | log "New request"; state working. Prompt text is NOT shown in the HUD (debug view only) |
-| PreToolUse | Read | character to Board; file name scrolls on screen | Read glows; label "Reading (file)" |
-| PreToolUse | Grep, Glob | character to Board; pattern scrolls | Grep glows; label "Searching (pattern)" |
-| PreToolUse | Edit, Write, NotebookEdit | character to Smelter; flame grows | Edit glows; label "Editing (file)" |
-| PreToolUse | Bash, PowerShell | Terminal rings speed up | Bash glows; label "Running command" |
-| PreToolUse | WebSearch, WebFetch | Orbit Sphere spins faster, rings brighten | Web glows; label "Searching the web (host)" |
-| PreToolUse | TodoWrite, Task* tools | Board shows task count | label "Planning tasks" |
-| PreToolUse | anything else (MCP, Skill, ...) | desk hologram pulses | log only |
-| PostToolUse | pair | station eases back to idle (~1 s) | context +1, total +1 (XP); skill dims |
-| PostToolUseFailure | pair (fires instead of PostToolUse when a tool errors or is interrupted) | station sputters: short red flicker, then idle | context +1, total +1 (the call still used context); skill dims; log "Tool failed: error" or "Interrupted" |
-| PermissionRequest | - | scene tints yellow, character waves at camera | Permission blinks yellow; state waiting; log "Permission needed: Tool (target)". Cleared by pair PostToolUse, next PreToolUse, UserPromptSubmit or Stop |
-| SubagentStart | per `agent_id` | small helper bot rises out of the portal and hovers near the work | log "Helper launched (agent_type)"; helper count |
-| SubagentStop | same `agent_id` | helper flies back into the portal and fades | log "Helper returned" |
-| PreCompact | `trigger` | racks flash, LEDs drain top to bottom | log "Compacting context (auto/manual)" |
-| PostCompact | - | racks empty | context bar -> 0 |
-| Stop | - | character walks to the arcade and plays; falls slow down | state idle; log "Turn finished" |
-| StopFailure | `error` (e.g. rate_limit) | lights go out, red alert pulse on rims | state error (red); label shows error type; cleared by next UserPromptSubmit/SessionStart |
-| SessionEnd | `reason` | scene powers down, character fades | timer stops; state ended; log "Session ended (reason)" |
-| (derived) | events in the last 60 s | data falls speed scales with rate; slow when idle | - |
-| (derived) | tool uses since compaction | rack LEDs lit = count / `contextBarMax` | context bar |
+| SessionStart | any `source` | scene powers up from standby (dim), character appears at the desk in a light column, dais flashes | session timer starts; state working/idle; log "Session started (source)" |
+| UserPromptSubmit | - | dais flashes; character goes to the desk and types; clears waiting/error states | log "New request"; state working. Prompt text is NOT shown in the HUD (debug view only) |
+| PreToolUse | Read | character walks to the Board and points at it; board brightens; file name runs along a ticker strip at the board's bottom | Read glows; label "Reading (file)" |
+| PreToolUse | Grep, Glob | same, the ticker shows the pattern (magnifier icon) | Grep glows; label "Searching (pattern)" |
+| PreToolUse | Edit, Write, NotebookEdit | character walks to the Smelter and hammers; flames grow, sparks fly, furnace glows | Edit glows; label "Editing (file)" |
+| PreToolUse | Bash, PowerShell | character types at the desk; Terminal rings spin up and brighten | Bash glows; label "Running command" |
+| PreToolUse | WebSearch, WebFetch | character types at the desk; Orbit Sphere spins faster, rings brighten | Web glows; label "Searching the web (host)" |
+| PreToolUse | TodoWrite, Task* tools | character to the Board; TodoWrite: ticker shows one chip per task (done green, in progress yellow, open outline; counts only) | label "Planning tasks" |
+| PreToolUse | anything else (MCP, Skill, ...) | character types at the desk; desk holograms pulse | log only |
+| PostToolUse | pair | station eases back to idle (~1 s); character stays 2.5 s, then returns to the desk | context +1, total +1 (XP); skill dims |
+| PostToolUseFailure | pair (fires instead of PostToolUse when a tool errors or is interrupted) | station sputters: drops dark at once, red flicker (~1 s) | context +1, total +1 (the call still used context); skill dims; log "Tool failed: error" or "Interrupted" |
+| PermissionRequest | - | desk light turns yellow; character turns to the camera and waves (at its station) | yellow vignette blinks over the scene; Permission blinks yellow; state waiting; log "Permission needed: Tool (target)". Cleared by pair PostToolUse, next PreToolUse, UserPromptSubmit or Stop |
+| SubagentStart | per `agent_id` | helper bot rises out of the big portal (portal flares), hovers over the station of its current call, circles the portal while thinking | log "Helper launched (agent_type)"; Portal Ring label while helpers run |
+| SubagentStop | same `agent_id` | helper flies back over the portal and sinks into it; its unfinished calls end | log "Helper returned" |
+| PreCompact | `trigger` | rack strips flash, LEDs drain top to bottom (1.5 s) | log "Compacting context (auto/manual)" |
+| PostCompact | - | racks stay empty | context bar -> 0 |
+| Stop | - | character walks to the arcade and plays; arcade screen lights up | state idle; log "Turn finished" |
+| StopFailure | `error` (e.g. rate_limit) | lights go down, red alert pulse on every platform rim; character slumps at the desk | red vignette; state error (red); label shows error type; cleared by next UserPromptSubmit/SessionStart |
+| SessionEnd | `reason` | scene dims to standby, character fades out in a light column | timer stops; state ended; log "Session ended (reason)" |
+| (derived) | events in the last 60 s (all sessions) | data falls: 0.3x when idle up to ~3.8x at 40+ events per minute | - |
+| (derived) | tool uses since compaction | rack LEDs lit = count / `contextBarMax` (bottom row first, all 144 at the max) | context bar |
+
+Safety nets against stuck states (server): a main-agent PreToolUse or Stop/StopFailure ends a
+compaction that never got PostCompact; SubagentStop ends that helper's unfinished calls. A permission
+denied in the dialog fires no hook (hooks docs), so "waiting" stays until the next event that clears it.
 
 Level: XP = total finished tool calls (PostToolUse + PostToolUseFailure), stored on disk by the server.
 `level = floor(sqrt(xp / 5)) + 1`; progress = `(xp - 5(L-1)^2) / (5L^2 - 5(L-1)^2)`.

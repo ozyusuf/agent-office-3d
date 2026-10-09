@@ -33,11 +33,12 @@ function cached(key, make) {
 
 /**
  * Unlit glowing material. Intensity > 1 is HDR and crosses the bloom threshold.
- * opts: opacity, additive, side, map
+ * opts: opacity, additive, side, own (a material of its own that may be changed at runtime;
+ * cached ones are shared by many objects and must stay as they are)
  */
 export function neon(color, intensity = 2, opts = {}) {
-  const { opacity = 1, additive = false, side = THREE.FrontSide } = opts;
-  return cached(`neon|${color}|${intensity}|${opacity}|${additive}|${side}`, () => {
+  const { opacity = 1, additive = false, side = THREE.FrontSide, own = false } = opts;
+  const make = () => {
     const m = new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(intensity), side });
     if (opacity < 1 || additive) {
       m.transparent = true;
@@ -46,7 +47,18 @@ export function neon(color, intensity = 2, opts = {}) {
     }
     if (additive) m.blending = THREE.AdditiveBlending;
     return m;
-  });
+  };
+  return own ? make() : cached(`neon|${color}|${intensity}|${opacity}|${additive}|${side}`, make);
+}
+
+/** Sets an unlit material's colour to `color` x `intensity` (for glow that changes at runtime). */
+export function setGlow(material, color, intensity) {
+  material.color.setHex(color).multiplyScalar(intensity);
+}
+
+/** Moves `value` towards `target`: about 63 % of the way every `tau` seconds (frame-rate independent). */
+export function ease(value, target, dt, tau) {
+  return value + (target - value) * (1 - Math.exp(-dt / tau));
 }
 
 /** Lit surface. Shared per parameter set. */
@@ -463,7 +475,9 @@ export function platform({ x = 0, z = 0, w, d, top = 0, h = 0.8, chamfer = 1, ri
     strip.translate((ax + bx) / 2, 0.02, (az + bz) / 2);
     rimParts.push(strip);
   }
-  group.add(new THREE.Mesh(mergeGeometries(rimParts), neon(rim, rimGlow)));
+  const rimMesh = new THREE.Mesh(mergeGeometries(rimParts), neon(rim, rimGlow));
+  group.add(rimMesh);
+  group.userData.rim = rimMesh; // the red alert overlay reuses its geometry (world.js)
 
   // Slit lights on the +x and +z faces (the ones the camera sees).
   if (slits) {

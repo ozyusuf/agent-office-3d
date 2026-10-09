@@ -1,16 +1,21 @@
 // Station labels and the character label: HTML elements in a full-window layer between the 3D canvas
 // and the HUD panels. With the 3D scene they follow their station's anchor point every frame, shrink
-// with the scene in small windows, and step aside when they would overlap each other. Without the
-// scene (no WebGL) they sit at the fixed stage 2 slots inside the HUD's middle area.
+// with the scene in small windows, and step aside when they would overlap each other (the step aside
+// is eased, so labels glide instead of jumping while the character walks past). Without the scene
+// (no WebGL) they sit at the fixed stage 2 slots inside the HUD's middle area.
 
 const EDGE = 6; // keep labels this far from the window edges
 const GAP = 4; // minimum space between two labels
 const FULL_SIZE_PPU = 40; // scene scale (CSS px per world unit) at which labels are full size
 const MIN_SCALE = 0.7;
+const GLIDE_S = 0.12; // time constant of the step-aside easing
 
 export function createLabelLayer(layer, middle) {
   const sizes = new WeakMap(); // element -> cached { w, h } (reset when its text changes)
   const written = new WeakMap(); // element -> last transform written
+  const offsets = new WeakMap(); // element -> eased { dx, dy } away from its anchor
+  let shownLast = new Set(); // labels placed in the previous update
+  let lastUpdate = 0;
   let realm = null;
 
   function size(el) {
@@ -27,6 +32,9 @@ export function createLabelLayer(layer, middle) {
 
   /** Called after every rendered frame (and on resize when there is no 3D scene). */
   function update() {
+    const now = performance.now();
+    const glide = 1 - Math.exp(-Math.min(0.1, (now - lastUpdate) / 1000) / GLIDE_S);
+    lastUpdate = now;
     const scale = realm ? Math.min(1, Math.max(MIN_SCALE, realm.pixelsPerUnit() / FULL_SIZE_PPU)) : 1;
     const rect = realm ? null : middle.getBoundingClientRect();
     const items = [];
@@ -44,16 +52,32 @@ export function createLabelLayer(layer, middle) {
         continue;
       }
       const { w, h } = size(el);
-      items.push({ el, x: at.x, y: at.y, w: w * scale, h: h * scale, rank: rank(el) });
+      items.push({ el, ax: at.x, ay: at.y, x: at.x, y: at.y, w: w * scale, h: h * scale, rank: rank(el) });
     }
     items.sort((a, b) => a.rank - b.rank);
     const placed = [];
+    const shown = new Set();
     for (const item of items) {
       clampX(item);
       stepAside(item, placed);
       placed.push(item);
+      // Ease the offset from the anchor; a label that just appeared goes straight to its place.
+      const dx = item.x - item.ax;
+      const dy = item.y - item.ay;
+      let off = offsets.get(item.el);
+      if (!off || !shownLast.has(item.el)) {
+        off = { dx, dy };
+        offsets.set(item.el, off);
+      } else {
+        off.dx += (dx - off.dx) * glide;
+        off.dy += (dy - off.dy) * glide;
+      }
+      item.x = item.ax + off.dx;
+      item.y = item.ay + off.dy;
       write(item, scale);
+      shown.add(item.el);
     }
+    shownLast = shown;
   }
 
   function clampX(item) {

@@ -130,7 +130,7 @@ test('subagent calls: XP yes, main context no; activity prefers the main agent',
   let f = hud.snapshot().focus;
   assert.deepEqual(f.activeKinds.sort(), ['agent', 'search']);
   assert.equal(f.activity.kind, 'agent');
-  assert.deepEqual(f.helpers, ['Explore']);
+  assert.deepEqual(f.helpers, [{ id: 'ag1', agentType: 'Explore', kind: 'search' }]);
   hud.apply(post('Grep', 'search', 'x1', { agentId: 'ag1' }));
   f = hud.snapshot().focus;
   assert.equal(f.context, 0);
@@ -192,4 +192,51 @@ test('Stop keeps running background subagent calls, a new prompt clears them', (
   assert.deepEqual(hud.snapshot().focus.activeKinds, ['shell']);
   hud.apply(ev('UserPromptSubmit'));
   assert.deepEqual(hud.snapshot().focus.activeKinds, []);
+});
+
+test('turnEnded: set by Stop, StopFailure and interrupts; cleared by a prompt, session start or main tool call', () => {
+  const { hud } = run([ev('SessionStart', { source: 'startup' })]);
+  assert.equal(hud.snapshot().focus.turnEnded, false); // a fresh session waits at the desk
+  hud.apply(ev('UserPromptSubmit'));
+  hud.apply(ev('Stop'));
+  assert.equal(hud.snapshot().focus.turnEnded, true);
+  hud.apply(pre('Read', 'read', 'r1')); // a turn can start without a prompt (background task done)
+  assert.equal(hud.snapshot().focus.turnEnded, false);
+  hud.apply(ev('PostToolUseFailure', { tool: 'Read', kind: 'read', toolUseId: 'r1', interrupted: true }));
+  assert.equal(hud.snapshot().focus.turnEnded, true);
+  hud.apply(ev('UserPromptSubmit'));
+  hud.apply(ev('StopFailure', { error: 'overloaded' }));
+  assert.equal(hud.snapshot().focus.turnEnded, true);
+  hud.apply(ev('SessionStart', { source: 'resume' }));
+  assert.equal(hud.snapshot().focus.turnEnded, false);
+});
+
+test('a subagent call without its Post event ends with SubagentStop', () => {
+  const { hud } = run([
+    ev('UserPromptSubmit'),
+    ev('SubagentStart', { agentId: 'ag1', agentType: 'Explore' }),
+    ev('SubagentStart', { agentId: 'ag2', agentType: 'Plan' }),
+    pre('Grep', 'search', 'x1', { agentId: 'ag1' }),
+    pre('Read', 'read', 'x2', { agentId: 'ag2' }),
+  ]);
+  hud.apply(ev('SubagentStop', { agentId: 'ag1' }));
+  const f = hud.snapshot().focus;
+  assert.deepEqual(f.activeKinds, ['read']);
+  assert.deepEqual(f.helpers, [{ id: 'ag2', agentType: 'Plan', kind: 'read' }]);
+});
+
+test('a compaction that never finishes is cleared by the next main tool call or Stop', () => {
+  const a = run([ev('UserPromptSubmit'), ev('PreCompact', { trigger: 'auto' }), pre('Read', 'read', 'r1')]);
+  assert.equal(a.focus.compacting, null);
+  const b = run([ev('UserPromptSubmit'), ev('PreCompact', { trigger: 'manual' }), ev('Stop')]);
+  assert.equal(b.focus.compacting, null);
+  assert.equal(b.focus.status, 'idle');
+  // A subagent's call does not end the main agent's compaction.
+  const c = run([ev('UserPromptSubmit'), ev('PreCompact', { trigger: 'auto' }), pre('Read', 'read', 'x1', { agentId: 'ag1' })]);
+  assert.equal(c.focus.compacting.trigger, 'auto');
+});
+
+test('TodoWrite counts reach the activity', () => {
+  const { focus } = run([ev('UserPromptSubmit'), pre('TodoWrite', 'task', 't1', { todos: { total: 4, done: 1, doing: 1 } })]);
+  assert.deepEqual(focus.activity.todos, { total: 4, done: 1, doing: 1 });
 });

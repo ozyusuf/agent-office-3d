@@ -53,12 +53,14 @@ export class HudState {
         s.startedAt = e.hookTs;
         s.startExact = true;
         endTurn(s, true);
+        s.turnEnded = false;
         s.error = null;
         s.helpers.clear();
         break;
 
       case 'UserPromptSubmit':
         endTurn(s, true);
+        s.turnEnded = false;
         s.error = null;
         s.turn = true;
         break;
@@ -69,9 +71,13 @@ export class HudState {
         if (p && !p.toolUseId && p.tool === e.tool) p.toolUseId = e.toolUseId ?? null;
         else s.permission = null;
         s.active.set(e.toolUseId ?? `anon-${this.anon++}`, {
-          tool: e.tool, kind: e.kind, target: e.target, agentId: e.agentId, startedAt: e.hookTs,
+          tool: e.tool, kind: e.kind, target: e.target, todos: e.todos, agentId: e.agentId, startedAt: e.hookTs,
         });
-        if (main) s.turn = true;
+        if (main) {
+          s.turn = true;
+          s.turnEnded = false;
+          s.compacting = null; // the main agent cannot run tools while its context is compacting
+        }
         break;
       }
 
@@ -86,7 +92,10 @@ export class HudState {
           s.turn = true;
         }
         // A user interrupt (Esc) ends the turn and no Stop event follows (hooks docs).
-        if (e.interrupted) endTurn(s, true);
+        if (e.interrupted) {
+          endTurn(s, true);
+          s.turnEnded = true;
+        }
         break;
 
       case 'PermissionRequest': {
@@ -103,6 +112,8 @@ export class HudState {
 
       case 'SubagentStop':
         s.helpers.delete(e.agentId);
+        // A finished helper has no running calls; drop any whose Post event never came.
+        if (e.agentId) for (const [key, a] of s.active) if (a.agentId === e.agentId) s.active.delete(key);
         break;
 
       case 'PreCompact':
@@ -116,10 +127,14 @@ export class HudState {
 
       case 'Stop':
         endTurn(s, false); // background subagent calls may still be running
+        s.turnEnded = true;
+        s.compacting = null; // a compaction without PostCompact (e.g. blocked) must not stay on
         break;
 
       case 'StopFailure':
         endTurn(s, false);
+        s.turnEnded = true;
+        s.compacting = null;
         s.error = { error: e.error ?? 'unknown', details: e.errorDetails ?? null };
         break;
 
@@ -160,6 +175,7 @@ export class HudState {
         contextExact: false, // exact after SessionStart(startup/clear/compact) or PostCompact
         toolsDone: 0,
         turn: false,
+        turnEnded: false, // the last turn finished (Stop, StopFailure, interrupt) and no new one began
         active: new Map(), // tool_use_id -> running tool call
         permission: null,
         error: null,
@@ -223,6 +239,7 @@ function view(s) {
   const active = [...s.active.values()];
   // The character shows the main agent's own call; subagent calls only when it has none.
   const current = active.findLast((a) => !a.agentId) ?? active.at(-1);
+  const helperKind = (id) => active.findLast((a) => a.agentId === id)?.kind ?? null;
   return {
     sessionId: s.id,
     project: s.project,
@@ -236,13 +253,18 @@ function view(s) {
     context: s.context,
     contextExact: s.contextExact,
     toolsDone: s.toolsDone,
+    turnEnded: s.turnEnded,
     activity: current
-      ? { tool: current.tool, kind: current.kind, target: current.target, agentId: current.agentId, startedAt: current.startedAt }
+      ? {
+        tool: current.tool, kind: current.kind, target: current.target, todos: current.todos,
+        agentId: current.agentId, startedAt: current.startedAt,
+      }
       : null,
     activeKinds: [...new Set(active.map((a) => a.kind))],
     permission: s.permission ? { tool: s.permission.tool, target: s.permission.target } : null,
     error: s.error,
-    helpers: [...s.helpers.values()].map((h) => h.agentType),
+    // One entry per running subagent; `kind` = what its latest running call is doing.
+    helpers: [...s.helpers].map(([id, h]) => ({ id, agentType: h.agentType, kind: helperKind(id) })),
     compacting: s.compacting,
   };
 }

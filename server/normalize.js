@@ -114,12 +114,18 @@ function describeTool(tool, input, cwd) {
     case 'Task':
       return { target: oneLine(input.description || input.subagent_type, MAX_TEXT) };
     case 'TodoWrite':
-      return Array.isArray(input.todos) ? { target: `${input.todos.length} todos` } : {};
+      return Array.isArray(input.todos) ? { target: `${input.todos.length} todos`, todos: countTodos(input.todos) } : {};
     case 'Skill':
       return { target: oneLine(input.skill || input.command, MAX_TEXT) };
   }
   if (tool.startsWith('mcp__')) return { target: tool.split('__').slice(1).join(' / ') };
   return {};
+}
+
+// Task list as counts only (the board draws one chip per task; no task text leaves the server).
+function countTodos(todos) {
+  const by = (status) => todos.filter((t) => t?.status === status).length;
+  return { total: todos.length, done: by('completed'), doing: by('in_progress') };
 }
 
 function str(value) {

@@ -175,3 +175,50 @@ test-related name, "Komut Çarkı" was rejected). English names unchanged.
 every Bash/PowerShell call (npm, git, tests, ...), not only to tests, so the name stays general.
 Replaces the centrifuge names in D34 ("Test Laboratuvarı") and "Test Centrifuge"; the internal key
 stays `centrifuge`. Test commands are not routed to a separate station.
+
+## 2026-10-09 - Stage 4
+
+**D36. Scene logic is split into pure decisions and eased drive values.** `director.js` (what should
+happen) and `walk.js` (where the character may walk) have no three.js and are unit-tested in node;
+`realm.js` eases a shared `drive` object towards the director's goals every frame and the stations,
+character and bots only read `drive`. The server stays the single source of truth (D15); the scene
+is a function of its snapshot plus short reactions to live events (not to replayed history).
+
+**D37. The character follows only the main agent and walks only to the Smelter and the Board.**
+Bash, web and other tools are worked from the desk (the Terminal and the Orbit Sphere are on other
+platforms; walking there would be long and hide the character); those stations react on their own.
+Subagent calls are shown by helper bots, not by the character.
+
+**D38. Display timings: every PreToolUse lights its station for at least 0.7 s, the character
+stays at a work station 2.5 s after the call ends, walks take ~1.2 s.** Real calls often last 50 ms
+and Pre/Post arrive in the same 350 ms flush (D3), so without a hold nothing would be seen; the
+linger stops the character running back and forth between calls. These are animation times, not
+data: no state is invented and nothing stays on after the hold ends.
+
+**D39. `turnEnded` in the server state:** set by Stop, StopFailure and interrupts, cleared by a
+prompt, SessionStart or a main-agent PreToolUse. The character plays at the arcade (and the Arcade
+label shows) only after a finished turn; a fresh session waits at the desk (DESIGN: SessionStart
+"appears at desk", Stop "walks to the arcade"). Replaces "arcade = any idle state" (D27 table).
+
+**D40. Safety nets against stuck states:** a main-agent PreToolUse, Stop or StopFailure ends a
+compaction without PostCompact (PreCompact can be blocked); SubagentStop ends that helper's open
+calls. A permission denied in the dialog fires no hook at all (hooks docs), so it is left as a known
+limitation instead of being guessed with a timeout.
+
+**D41. Power and alert dim the whole scene through the tone-mapping exposure** (one value, works
+with bloom on and off): standby before the first event and after SessionEnd (character hidden),
+"lights out" on StopFailure with an additive red overlay on every platform rim. The permission and
+error tints are a CSS vignette layer between the canvas and the labels (plus a yellow desk light).
+
+**D42. The board's ticker shows real values only:** the file name, the search pattern, or one chip
+per TodoWrite task (normalize.js sends counts `{ total, done, doing }`, never the task text). It runs
+along the board's bottom, repeated, because the character label covers the top.
+
+**D43. Materials that change at runtime are owned** (`neon(..., { own: true })`); cached ones are
+shared across the scene. The character clones its materials so it can fade without fading the desk.
+
+**D44. Activity rate = events of all sessions in the last 60 s** (falls 0.3x idle up to ~3.8x at 40
+per minute); rack LEDs lit = context / `contextBarMax` x 144, bottom row first.
+
+**D45. Label step-aside is eased (0.12 s)** so labels glide while the character walks past (stage 3
+known issue). The decor box moved to (3.1, -1.1) to clear the walk to the board.

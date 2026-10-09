@@ -24,13 +24,19 @@ const BY_KIND = {
   agent: 'portal',
 };
 
+/** Station that works on a tool kind (anything unknown is handled at the desk). */
+export function stationForKind(kind) {
+  return BY_KIND[kind] ?? 'desk';
+}
+
 /** Set of station keys that should light up for this focus session state. */
 export function activeStations(focus) {
   const on = new Set();
   if (!focus || focus.status === 'ended') return on;
-  for (const kind of focus.activeKinds) on.add(BY_KIND[kind] ?? 'desk');
+  for (const kind of focus.activeKinds) on.add(stationForKind(kind));
   if (focus.helpers.length) on.add('portal');
   if (focus.compacting) on.add('racks');
-  if (focus.status === 'idle') on.add('arcade');
+  // The agent plays at the arcade after a finished turn; a fresh session waits at the desk.
+  if (focus.status === 'idle' && focus.turnEnded) on.add('arcade');
   return on;
 }

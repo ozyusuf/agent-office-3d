@@ -1,14 +1,47 @@
 # Progress
 
 ## Current state
-- **Stage 3 done** (verified 2026-10-09). Next: **Stage 4 - events -> animations.**
-- Run: `npm install` (three.js was added), `npm start`, open http://127.0.0.1:7847 (HUD) or
-  /debug.html (raw events). Restart the server after pulling new server code (an old
-  `node server/index.js` keeps running the old code and has no `/vendor/three/` route).
+- **Stage 4 done** (verified 2026-10-09). Next: **Stage 5 - personalisation and settings.**
+- Run: `npm install`, `npm start`, open http://127.0.0.1:7847 (HUD) or /debug.html (raw events).
+  Restart the server after pulling new server code (an old `node server/index.js` keeps running
+  the old code; stage 4 changed the state snapshot).
 - Local `config.json` (gitignored) sets language, `bloom`, `pixelRatioCap` etc.; XP lives in
   `data/stats.json` (gitignored).
 
 ## Session log (newest first)
+
+### 2026-10-09 - Session 4 - Stage 4 (events -> animations)
+**Done**
+- Verified in the hooks docs: a permission denied in the dialog fires no hook (PermissionDenied is
+  auto mode only); SubagentStart/Stop carry `agent_id` and fire for background agents.
+- Server: `turnEnded` flag (arcade only after a finished turn), helpers as `{ id, agentType, kind }`,
+  SubagentStop ends that helper's open calls, main PreToolUse / Stop / StopFailure end a compaction
+  without PostCompact, TodoWrite -> task counts only (`todos`). Tests for each.
+- Scene: `director.js` (goals from state + live events; hold 0.7 s, linger 2.5 s), `walk.js`
+  (ring + legs, never through the console), `realm.js` eases a `drive` object every frame;
+  character rebuilt with hip joints, poses (type, forge + hammer, present, wave, play, slump), walking
+  and fade; `helpers.js` bots per subagent; every station reacts (see DESIGN.md section 5); board
+  ticker (file / pattern / task chips); rack LEDs from context fill; red alert rims; standby and
+  alert via exposure; CSS yellow/red vignette; label step-aside eased. 56 tests pass.
+- Checks: scripted session (21 states) as raw hook JSON on a scratch server (port 7861, scratch
+  config/data) in headless Edge at 600x1000, 420x900, 702x765 - every state on the right station,
+  no stuck states, no console errors, 54-55 fps (headless cap = 60) with 180 draw calls. Live: real
+  Read/Grep/Write/Edit/Bash/WebFetch events of this session on the user's server (started for the
+  check, stopped after; it added real XP) moved the character and stations as designed.
+
+**Left:** stages 5-6.
+
+**Known issues / open questions**
+- Denying a permission fires no hook: "waiting" and that call's station stay on until the next
+  clearing event (next PreToolUse, prompt, Stop).
+- Helper bots and real subagents were only tested with documented-format fake events, not live.
+- Bots can hide behind HTML labels for a moment; the character label covers the board's top.
+- `prefers-reduced-motion` is still not applied to the 3D scene (walks, spins).
+- fps still measured in headless Edge only; a check in the user's real browser is worth doing.
+
+**Next step:** `/next` -> Stage 5. First tasks: settings panel from the gear icon, a server
+endpoint to save config.json (validated, Host/Origin checked), live apply (accent colour re-tints
+`theme.css` tokens and the neon materials).
 
 ### 2026-10-09 - Session 3 - Stage 3 (static 3D scene)
 **Done**

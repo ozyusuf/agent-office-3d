@@ -3,7 +3,7 @@
 // Layout follows docs/DESIGN.md section 4 (positions as seen in docs/design/reference.png).
 
 import * as THREE from 'three';
-import { P, FACE_CAMERA, rng, MAT, TEX, platform, chamferOutline, pipeGeometries, merged, glowSprite } from './kit.js';
+import { P, FACE_CAMERA, rng, MAT, TEX, platform, chamferOutline, pipeGeometries, merged, glowSprite, setGlow } from './kit.js';
 
 /** Platforms by name, so props can be placed on them. `top` = floor height. */
 export const PLATFORMS = {
@@ -14,23 +14,48 @@ export const PLATFORMS = {
   south: { x: 1.0, z: 7.4, w: 3.4, d: 3.2, top: -3.4, h: 0.6, chamfer: 0.7, rim: P.neonCyan },
 };
 
-export function buildWorld(scene) {
+/**
+ * @param {THREE.Scene} scene
+ * @param {object} drive  live values set by realm.js from the session state (`alert`, ...)
+ */
+export function buildWorld(scene, drive) {
   const ticks = [];
   const group = new THREE.Group();
   group.name = 'world';
   scene.add(group);
 
-  for (const spec of Object.values(PLATFORMS)) group.add(platform(spec));
+  const slabs = Object.values(PLATFORMS).map((spec) => platform(spec));
+  group.add(...slabs);
   group.add(bridges());
   group.add(pipes());
   group.add(cables());
   addBackground(scene, group, ticks);
-  addLights(scene);
+  const lights = addLights(scene);
+  ticks.push(alertRims(slabs, drive));
 
   // The camera frames the main platform (realm.js); the others may run off the window edges.
   const m = PLATFORMS.main;
   const fit = chamferOutline(m.w, m.d, m.chamfer).map(([x, z]) => new THREE.Vector3(m.x + x, m.top, m.z + z));
-  return { group, ticks, fit };
+  return { group, ticks, fit, lights };
+}
+
+// StopFailure: a red pulse runs over every platform rim (on top of the normal neon strip).
+function alertRims(slabs, drive) {
+  const material = new THREE.MeshBasicMaterial({
+    color: P.alertRed, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  const rims = slabs.map((slab) => {
+    const rim = new THREE.Mesh(slab.userData.rim.geometry, material);
+    rim.scale.set(1.004, 1.6, 1.004);
+    rim.visible = false;
+    slab.add(rim);
+    return rim;
+  });
+  return (t) => {
+    const on = drive.alert > 0.01;
+    for (const rim of rims) rim.visible = on;
+    if (on) setGlow(material, P.alertRed, drive.alert * (2.2 + 2.0 * Math.max(0, Math.sin(t * Math.PI * 1.6))));
+  };
 }
 
 // Short ramp and step between platforms.
@@ -171,17 +196,21 @@ function addLights(scene) {
   fill.position.set(-4, 3, 8);
   scene.add(fill);
 
-  for (const [x, y, z, color, intensity, range] of [
-    [1.3, 3.2, 1.3, P.neonCyan, 11, 10], // command desk, in front of the character
-    [-2.5, 1.8, 2.9, P.fireOrange, 14, 8], // smelter
-    [0.3, 2.8, -2.6, P.neonBlue, 12, 9], // board
-    [7.9, 1.0, 1.2, P.neonMagenta, 12, 9], // centrifuge
-    [-6.2, 2.6, 0.6, P.neonMagenta, 10, 9], // racks + arcade
+  // Station lights by station key; realm.js brightens them while their station works.
+  const lights = {};
+  for (const [key, x, y, z, color, intensity, range] of [
+    ['desk', 1.3, 3.2, 1.3, P.neonCyan, 11, 10], // in front of the character
+    ['smelter', -2.5, 1.8, 2.9, P.fireOrange, 14, 8],
+    ['board', 0.3, 2.8, -2.6, P.neonBlue, 12, 9],
+    ['centrifuge', 7.9, 1.0, 1.2, P.neonMagenta, 12, 9],
+    ['racks', -6.2, 2.6, 0.6, P.neonMagenta, 10, 9], // racks + arcade
   ]) {
     const light = new THREE.PointLight(color, intensity, range, 1.6);
     light.position.set(x, y, z);
     scene.add(light);
+    lights[key] = { light, base: intensity };
   }
+  return lights;
 }
 
 /** Image-based lighting: a tiny procedural "room" of neon panels, so metal reflects colour. */

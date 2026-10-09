@@ -1,10 +1,12 @@
 // Stations and decor built from primitives (docs/DESIGN.md section 4). Each builder returns
-// { group, anchor, tick?, bounds? }: `anchor` is the world point its HTML label hangs from;
-// `tick(t, dt)` runs ambient motion; `bounds` are points the camera keeps in view vertically.
-// Stage 4 drives the stations from events; here they only idle.
+// { group, anchor, core?, hover?, tick?, bounds? }: `anchor` is the world point its HTML label hangs
+// from; `core` is where a failed call sputters; `hover` is where a helper bot waits while working
+// there; `tick(t, dt)` runs the motion; `bounds` are points the camera keeps in view vertically.
+// Stations react to `drive` (set by realm.js from real events): `drive.act[key]` is 0..1 while the
+// station works. Anything that changes at runtime has a material of its own (`neon(..., { own })`).
 
 import * as THREE from 'three';
-import { P, TAU, FACE_CAMERA, rng, neon, solid, MAT, TEX, pipeGeometries, merged, glowSprite, flatRing } from './kit.js';
+import { P, TAU, FACE_CAMERA, rng, neon, solid, MAT, TEX, pipeGeometries, merged, glowSprite, flatRing, setGlow } from './kit.js';
 import { PLATFORMS } from './world.js';
 
 const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -15,29 +17,53 @@ function localPoint(group, x, y, z) {
   return group.localToWorld(v3(x, y, z));
 }
 
-export function buildProps(scene, camera) {
+export function buildProps(scene, camera, drive) {
   const ticks = [];
   const anchors = {};
+  const cores = {};
+  const hovers = {};
   const bounds = [];
   const add = (key, built) => {
     scene.add(built.group);
     if (built.anchor) anchors[key] = built.anchor;
+    if (built.core) cores[key] = built.core;
+    if (built.hover) hovers[key] = built.hover;
     if (built.tick) ticks.push(built.tick);
     if (built.bounds) bounds.push(...built.bounds);
   };
   const billboard = camera.quaternion.clone();
 
-  add('desk', commandDesk());
-  add('smelter', smelter(billboard));
-  add('board', visionBoard());
-  add('centrifuge', centrifuge());
-  add('orbit', orbitSphere());
-  add('racks', serverRacks());
-  add('falls', dataFalls());
-  add('portal', portals());
-  add('arcade', arcade());
+  add('desk', commandDesk(drive));
+  add('smelter', smelter(billboard, drive));
+  add('board', visionBoard(drive));
+  add('centrifuge', centrifuge(drive));
+  add('orbit', orbitSphere(drive));
+  add('racks', serverRacks(drive));
+  add('falls', dataFalls(drive));
+  add('portal', portals(drive));
+  add('arcade', arcade(drive));
   add('decor', decor());
-  return { anchors, ticks, bounds };
+  ticks.push(sputters(scene, cores, drive));
+  return { anchors, cores, hovers, ticks, bounds };
+}
+
+// PostToolUseFailure: the failed call's station sputters (a short, flickering red glow).
+function sputters(scene, cores, drive) {
+  const rand = rng(61);
+  const sprites = Object.entries(cores).map(([key, at]) => {
+    const sprite = glowSprite(P.alertRed, 2.8, 0);
+    sprite.position.copy(at);
+    sprite.visible = false;
+    scene.add(sprite);
+    return { key, sprite };
+  });
+  return () => {
+    for (const { key, sprite } of sprites) {
+      const s = drive.sputter[key] ?? 0;
+      sprite.visible = s > 0.01;
+      if (sprite.visible) sprite.material.opacity = s * (rand() < 0.4 ? 0.12 : 1);
+    }
+  };
 }
 
 // ---- Command desk: round dais, floating curved console, holo keyboard, laptop ----
@@ -45,7 +71,7 @@ export function buildProps(scene, camera) {
 export const DESK_POS = v3(0, 0, 0);
 export const DAIS_TOP = 0.2;
 
-function commandDesk() {
+function commandDesk(drive) {
   const group = new THREE.Group();
   group.position.copy(DESK_POS);
   group.rotation.y = FACE_CAMERA;
@@ -113,6 +139,7 @@ function commandDesk() {
   keys.rotation.x = -Math.PI / 2 + 0.35;
   keys.position.set(0, y - 0.05, 0.85);
   group.add(keys);
+  const holos = [];
   for (const [a, w] of [[-0.9, 0.5], [0.9, 0.46]]) {
     const holo = new THREE.Mesh(new THREE.PlaneGeometry(w, w * 0.62), new THREE.MeshBasicMaterial({
       map: TEX.board, color: new THREE.Color(0xffffff).multiplyScalar(1.4), transparent: true, opacity: 0.85,
@@ -121,6 +148,7 @@ function commandDesk() {
     holo.position.set(1.45 * Math.sin(a), y + 0.4, 1.45 * Math.cos(a));
     holo.rotation.set(-0.35, a, 0, 'YXZ');
     group.add(holo);
+    holos.push(holo.material);
   }
 
   // Laptop on the console's left arm, screen towards the camera.
@@ -141,10 +169,20 @@ function commandDesk() {
   laptop.add(face);
   group.add(laptop);
 
+  let spin = 0;
   return {
     group,
     anchor: localPoint(group, 0, 2.0, 1.6),
-    tick: (t) => { dashes.rotation.z = t * 0.15; },
+    core: v3(0, 1.3, 0),
+    hover: v3(1.9, 3.7, -1.4),
+    tick(t, dt) {
+      // Other tools (MCP, skills, ...) make the holograms pulse; a new prompt flashes the dais.
+      const busy = drive.act.desk;
+      spin += dt * (0.15 + busy * 0.9 + drive.prompt * 2.5);
+      dashes.rotation.z = spin;
+      setGlow(keys.material, P.neonCyan, 1.4 + drive.typing * (1.2 + 0.6 * Math.abs(Math.sin(t * 23))) + drive.prompt * 1.5);
+      for (const m of holos) m.color.setScalar(1.4 * (1 + busy * (0.6 + 0.4 * Math.sin(t * 9))));
+    },
   };
 }
 
@@ -183,7 +221,7 @@ function fixRingUv(geo, outer) {
 
 // ---- Code Smelter: furnace with fire core, flames and sparks ----
 
-function smelter(billboard) {
+function smelter(billboard, drive) {
   const group = new THREE.Group();
   group.position.set(-2.55, 0, 2.95);
   group.rotation.y = FACE_CAMERA;
@@ -206,11 +244,11 @@ function smelter(billboard) {
   group.add(merged(trims, MAT.trim));
 
   // Glowing bed inside the top opening, and a hot window on the front.
-  const bed = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.2, d - 0.2), neon(P.fireDeep, 1.5));
+  const bed = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.2, d - 0.2), neon(P.fireDeep, 1.5, { own: true }));
   bed.rotation.x = -Math.PI / 2;
   bed.position.y = h + 0.005;
   group.add(bed);
-  const hatch = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.2), neon(P.fireOrange, 2.0));
+  const hatch = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.2), neon(P.fireOrange, 2.0, { own: true }));
   hatch.position.set(-0.15, 0.5, d / 2 + 0.006);
   group.add(hatch);
   const slits = [];
@@ -253,7 +291,11 @@ function smelter(billboard) {
   return {
     group,
     anchor: localPoint(group, 0, 2.5, 0),
+    core: localPoint(group, 0, 1.3, 0),
+    hover: localPoint(group, 0.3, 4.3, -0.4), // above the station label
     tick(t, dt) {
+      // Idle: a low fire. Edit / Write: the flames grow, sparks fly, the furnace glows.
+      const heat = 0.25 + 0.75 * drive.act.smelter;
       fl.forEach((f, i) => {
         f.age += dt / f.life;
         if (f.age >= 1) {
@@ -263,8 +305,8 @@ function smelter(billboard) {
           f.s = 0.7 + rand() * 0.6;
         }
         const k = f.age;
-        const size = f.s * Math.sin(Math.PI * Math.min(1, k * 1.3)) * (1 - k * 0.4);
-        tmp.set(f.x * (1 - k * 0.5), h + 0.22 + k * 1.05, f.z * (1 - k * 0.5));
+        const size = f.s * Math.sin(Math.PI * Math.min(1, k * 1.3)) * (1 - k * 0.4) * (0.55 + 0.6 * heat);
+        tmp.set(f.x * (1 - k * 0.5), h + 0.22 + k * (0.45 + 0.9 * heat), f.z * (1 - k * 0.5));
         hot.setHex(k < 0.3 ? P.warnYellow : P.fireOrange).lerp(ember, Math.max(0, k - 0.35)).multiplyScalar(0.95);
         flames.set(i, tmp, size * 0.6, size * 1.1, hot);
       });
@@ -272,18 +314,27 @@ function smelter(billboard) {
         s.age += dt / s.life;
         if (s.age >= 1) {
           s.age = 0;
-          s.p.set((rand() - 0.5) * 0.8, h + 0.35, (rand() - 0.5) * 0.6);
-          s.v.set((rand() - 0.5) * 1.8, 1.6 + rand() * 1.6, (rand() - 0.5) * 1.8);
+          // A low fire throws only a few sparks.
+          if (rand() < heat * heat) {
+            s.p.set((rand() - 0.5) * 0.8, h + 0.35, (rand() - 0.5) * 0.6);
+            s.v.set((rand() - 0.5) * 1.8, 1.6 + rand() * 1.6, (rand() - 0.5) * 1.8);
+          } else {
+            s.p.set(0, -9, 0);
+            s.v.set(0, 0, 0);
+          }
         }
         s.v.y -= dt * 2.4;
         s.p.addScaledVector(s.v, dt);
-        const size = 0.08 * (1 - s.age);
+        const size = s.p.y < 0 ? 0 : 0.08 * (1 - s.age);
         hot.setHex(P.warnYellow).multiplyScalar(3 * (1 - s.age));
         sparks.set(i, s.p, size, size, hot);
       });
       flames.commit();
       sparks.commit();
-      halo.material.opacity = 0.28 + 0.05 * Math.sin(t * 9) + 0.03 * Math.sin(t * 23);
+      halo.material.opacity = 0.1 + 0.24 * heat + 0.05 * Math.sin(t * 9) + 0.03 * Math.sin(t * 23);
+      halo.scale.setScalar(2.4 + 1.6 * heat);
+      setGlow(bed.material, P.fireDeep, 0.7 + 1.1 * heat);
+      setGlow(hatch.material, P.fireOrange, 0.9 + 1.5 * heat);
     },
   };
 }
@@ -319,7 +370,7 @@ function particles(count, map, billboard) {
 
 // ---- Vision & Task Board: large curved holo screen ----
 
-function visionBoard() {
+function visionBoard(drive) {
   const group = new THREE.Group();
   group.position.set(0.5, 0, -3.8);
   group.rotation.y = FACE_CAMERA;
@@ -332,10 +383,26 @@ function visionBoard() {
   const uv = geo.attributes.uv;
   for (let i = 0; i < uv.count; i++) uv.setX(i, 1 - uv.getX(i)); // seen from inside: un-mirror
   geo.translate(0, yMid, R);
-  group.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+  const screen = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
     map: TEX.board, color: new THREE.Color(0xffffff).multiplyScalar(1.3), transparent: true, opacity: 0.93,
     side: THREE.DoubleSide, depthWrite: false,
-  })));
+  }));
+  group.add(screen);
+
+  // Ticker strip across the bottom of the screen (the character label covers the top): the file
+  // being read, the search pattern, or one chip per task (values of the latest call, drawn only
+  // when they change).
+  const ticker = tickerTexture();
+  const stripGeo = new THREE.CylinderGeometry(R - 0.07, R - 0.07, 0.55, 40, 1, true, Math.PI - half * 0.96, 2 * half * 0.96);
+  const stripUv = stripGeo.attributes.uv;
+  for (let i = 0; i < stripUv.count; i++) stripUv.setX(i, 1 - stripUv.getX(i));
+  stripGeo.translate(0, yMid - H / 2 + 0.4, R);
+  const strip = new THREE.Mesh(stripGeo, new THREE.MeshBasicMaterial({
+    map: ticker.texture, color: new THREE.Color(0xffffff).multiplyScalar(2.0), transparent: true, opacity: 0,
+    side: THREE.DoubleSide, depthWrite: false,
+  }));
+  strip.visible = false;
+  group.add(strip);
 
   const edge = (y) => {
     const pts = [];
@@ -351,7 +418,8 @@ function visionBoard() {
     bar.translate(s * R * Math.sin(half), yMid, R - R * Math.cos(half));
     frame.push(bar);
   }
-  group.add(merged(frame, neon(P.neonCyan, 2.6)));
+  const frameMat = neon(P.neonCyan, 2.6, { own: true });
+  group.add(merged(frame, frameMat));
 
   // Stand: two posts to the floor and a projector base.
   const posts = [];
@@ -364,19 +432,148 @@ function visionBoard() {
   base.translate(0, 0.08, 0.15);
   posts.push(base);
   group.add(merged(posts, MAT.trim));
-  const beam = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.035, 0.05), neon(P.neonCyan, 2.4));
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.035, 0.05), neon(P.neonCyan, 2.4, { own: true }));
   beam.position.set(0, 0.17, 0.41);
   group.add(beam);
   const glow = glowSprite(P.neonBlue, 6, 0.3);
   glow.position.set(0, yMid, 0.1);
   group.add(glow);
 
-  return { group, anchor: localPoint(group, 1.1, yMid + H / 2 + 0.2, 0.2) };
+  let shown = null;
+  return {
+    group,
+    anchor: localPoint(group, 1.1, yMid + H / 2 + 0.2, 0.2),
+    core: localPoint(group, 0, yMid, 0.3),
+    hover: localPoint(group, -1.7, yMid + H / 2 + 0.35, 0.7), // over the top left corner, clear of the label
+    tick(t, dt) {
+      // Read / Grep / Glob / task tools: the screen brightens and the ticker shows what is used.
+      const a = drive.act.board;
+      screen.material.color.setScalar(1.3 * (0.7 + 0.5 * a));
+      setGlow(frameMat, P.neonCyan, 2.6 * (0.7 + 0.5 * a));
+      setGlow(beam.material, P.neonCyan, 2.4 * (0.7 + 0.6 * a));
+      glow.material.opacity = 0.2 + 0.25 * a;
+      if (drive.board !== shown) {
+        shown = drive.board;
+        ticker.draw(shown);
+      }
+      strip.visible = a > 0.01 && Boolean(shown);
+      strip.material.opacity = a;
+      if (strip.visible && !shown.todos) ticker.texture.offset.x = (ticker.texture.offset.x + dt * 0.08) % 1;
+      else ticker.texture.offset.x = 0;
+    },
+  };
+}
+
+/** Canvas texture for the board's ticker strip. */
+function tickerTexture() {
+  const W = 1024;
+  const H = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const g = canvas.getContext('2d');
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.anisotropy = 4;
+
+  // Small icon at x: a page for Read, a magnifier for Grep / Glob.
+  const icon = (kind, x) => {
+    g.strokeStyle = '#e6f6ff';
+    g.lineWidth = 3;
+    if (kind === 'search') {
+      g.beginPath();
+      g.arc(x + 10, 28, 11, 0, TAU);
+      g.moveTo(x + 18, 36);
+      g.lineTo(x + 28, 46);
+      g.stroke();
+    } else {
+      g.strokeRect(x, 14, 22, 30);
+      for (const y of [22, 29, 36]) {
+        g.beginPath();
+        g.moveTo(x + 5, y);
+        g.lineTo(x + 17, y);
+        g.stroke();
+      }
+    }
+  };
+
+  const fit = (text, max) => {
+    if (g.measureText(text).width <= max) return text;
+    let lo = 0;
+    let hi = text.length;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (g.measureText(`${text.slice(0, mid)}…`).width <= max) lo = mid;
+      else hi = mid - 1;
+    }
+    return `${text.slice(0, lo)}…`;
+  };
+
+  // One chip per task: done green, in progress yellow, open as an outline.
+  const chips = ({ total, done, doing }) => {
+    const shown = Math.min(total, 22);
+    for (let i = 0; i < shown; i++) {
+      const x = 24 + i * 40;
+      if (i < done) {
+        g.fillStyle = '#56d999';
+        g.fillRect(x, 17, 28, 28);
+      } else if (i < done + doing) {
+        g.fillStyle = '#f4c752';
+        g.fillRect(x, 17, 28, 28);
+      } else {
+        g.strokeStyle = '#4fc3e4';
+        g.lineWidth = 3;
+        g.strokeRect(x + 1.5, 18.5, 25, 25);
+      }
+    }
+    if (total > shown) {
+      g.fillStyle = '#e6f6ff';
+      g.fillText(`+${total - shown}`, 24 + shown * 40, H / 2 + 1);
+    }
+  };
+
+  return {
+    texture,
+    draw(content) {
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(0, 0, W, H);
+      g.fillStyle = 'rgba(2, 8, 22, 0.94)';
+      g.fillRect(0, 6, W, H - 12);
+      g.fillStyle = 'rgba(80, 200, 240, 0.9)';
+      g.fillRect(0, 6, W, 2);
+      g.fillRect(0, H - 8, W, 2);
+      if (content) {
+        g.font = '600 34px Consolas, "Cascadia Mono", monospace';
+        g.textBaseline = 'middle';
+        g.shadowColor = 'rgba(80, 200, 240, 0.9)';
+        g.shadowBlur = 8;
+        if (content.todos) {
+          chips(content.todos);
+        } else if (content.target) {
+          // The text repeats along the strip (squeezed a little so the repeats tile seamlessly),
+          // so part of it is always visible next to the character.
+          const text = fit(content.target, W - 120);
+          const segment = 44 + g.measureText(text).width + 70;
+          const n = Math.max(1, Math.round(W / segment));
+          g.setTransform(W / (n * segment), 0, 0, 1, 0, 0);
+          g.fillStyle = '#ffffff';
+          for (let i = 0; i < n; i++) {
+            icon(content.kind, 12 + i * segment);
+            g.fillText(text, 12 + i * segment + 44, H / 2 + 1);
+          }
+          g.setTransform(1, 0, 0, 1, 0, 0);
+        }
+        g.shadowBlur = 0;
+      }
+      texture.needsUpdate = true;
+    },
+  };
 }
 
 // ---- Terminal (key "centrifuge"): three nested gimbal rings on a base, spins for shell commands ----
 
-function centrifuge() {
+function centrifuge(drive) {
   const p = PLATFORMS.east;
   const group = new THREE.Group();
   group.position.set(p.x, p.top, p.z);
@@ -411,36 +608,53 @@ function centrifuge() {
   }
   group.add(merged(yoke, MAT.trim));
 
+  const rings = [[P.neonMagenta, 2.6], [P.neonCyan, 2.5], [P.warnYellow, 2.4]].map(([color, intensity]) => (
+    { color, intensity, material: neon(color, intensity, { own: true }) }));
   const outer = new THREE.Group();
   outer.position.y = cy;
   group.add(outer);
-  outer.add(new THREE.Mesh(new THREE.TorusGeometry(1.95, 0.075, 10, 96), neon(P.neonMagenta, 2.6)));
+  outer.add(new THREE.Mesh(new THREE.TorusGeometry(1.95, 0.075, 10, 96), rings[0].material));
   const middle = new THREE.Group();
   outer.add(middle);
-  middle.add(new THREE.Mesh(new THREE.TorusGeometry(1.52, 0.065, 10, 80), neon(P.neonCyan, 2.5)));
+  middle.add(new THREE.Mesh(new THREE.TorusGeometry(1.52, 0.065, 10, 80), rings[1].material));
   const inner = new THREE.Group();
   middle.add(inner);
-  inner.add(new THREE.Mesh(new THREE.TorusGeometry(1.12, 0.06, 10, 72), neon(P.warnYellow, 2.4)));
-  outer.add(new THREE.Mesh(new THREE.SphereGeometry(0.28, 20, 14), neon(P.neonCyanSoft, 1.5)));
-  outer.add(glowSprite(P.neonCyan, 1.8, 0.4));
+  inner.add(new THREE.Mesh(new THREE.TorusGeometry(1.12, 0.06, 10, 72), rings[2].material));
+  const heart = new THREE.Mesh(new THREE.SphereGeometry(0.28, 20, 14), neon(P.neonCyanSoft, 1.5, { own: true }));
+  outer.add(heart);
+  const halo = glowSprite(P.neonCyan, 1.8, 0.4);
+  outer.add(halo);
 
+  const spin = [0, 0, 0];
   return {
     group,
     anchor: localPoint(group, 0.8, cy + 2.3, 0), // above the rings, a little to the right
-    tick(t) {
+    core: localPoint(group, 0, cy, 0),
+    hover: localPoint(group, -0.9, cy + 2.0, 0.9),
+    tick(t, dt) {
+      // Bash / PowerShell: the inner rings spin up and glow brighter.
+      const a = drive.act.centrifuge;
+      const speed = 1 + 4.5 * a;
+      spin[0] += dt * 0.6 * speed;
+      spin[1] += dt * 0.9 * speed;
+      spin[2] += dt * 0.4 * speed;
       // The outer ring stays roughly upright towards the camera; the inner two spin.
       outer.rotation.x = Math.sin(t * 0.5) * 0.3;
       outer.rotation.y = Math.sin(t * 0.37) * 0.35;
-      middle.rotation.y = t * 0.6;
-      inner.rotation.x = t * 0.9;
-      inner.rotation.z = t * 0.4;
+      middle.rotation.y = spin[0];
+      inner.rotation.x = spin[1];
+      inner.rotation.z = spin[2];
+      disc.rotation.z = -spin[0] * 0.6;
+      for (const r of rings) setGlow(r.material, r.color, r.intensity * (0.8 + 0.55 * a));
+      setGlow(heart.material, P.neonCyanSoft, 1.5 * (0.8 + 1.0 * a));
+      halo.material.opacity = 0.3 + 0.4 * a;
     },
   };
 }
 
 // ---- Orbit Sphere: glowing planet with two tilted rings, on a pipe pedestal ----
 
-function orbitSphere() {
+function orbitSphere(drive) {
   const group = new THREE.Group();
   group.position.set(-2.4, PLATFORMS.north.top, -7.8);
 
@@ -468,29 +682,41 @@ function orbitSphere() {
     const ring = new THREE.Group();
     ring.position.y = sphereY;
     ring.rotation.set(tilt, 0, roll);
-    ring.add(new THREE.Mesh(new THREE.TorusGeometry(r, 0.02, 6, 96), neon(color, 2.4)));
+    const material = neon(color, 2.4, { own: true });
+    ring.add(new THREE.Mesh(new THREE.TorusGeometry(r, 0.02, 6, 96), material));
     const moon = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 8), neon(color, 2.8));
     ring.add(moon);
     group.add(ring);
-    rings.push({ moon, r });
+    rings.push({ moon, r, color, material, angle: rings.length * 2 });
   }
 
+  let turn = 0;
   return {
     group,
     anchor: localPoint(group, 0, sphereY + 1.6, 0),
-    tick(t) {
-      planet.rotation.y = t * 0.25;
-      rings.forEach(({ moon, r }, i) => {
-        const a = t * (0.5 + i * 0.3) + i * 2;
-        moon.position.set(Math.cos(a) * r, Math.sin(a) * r, 0);
+    core: localPoint(group, 0, sphereY, 0),
+    hover: localPoint(group, 1.5, sphereY + 1.1, 1.3),
+    tick(t, dt) {
+      // WebSearch / WebFetch: the planet spins faster and its rings brighten.
+      const a = drive.act.orbit;
+      turn += dt * 0.25 * (1 + 5 * a);
+      planet.rotation.y = turn;
+      rings.forEach((ring, i) => {
+        ring.angle += dt * (0.5 + i * 0.3) * (1 + 3 * a);
+        ring.moon.position.set(Math.cos(ring.angle) * ring.r, Math.sin(ring.angle) * ring.r, 0);
+        setGlow(ring.material, ring.color, 2.4 * (0.75 + 0.85 * a));
       });
+      atmo.material.opacity = 0.55 + 0.4 * a;
     },
   };
 }
 
 // ---- Server racks: three tall cabinets with LED rows (unlit until stage 4 drives them) ----
 
-function serverRacks() {
+/** Number of LEDs on the three racks (realm.js lights a share of them by context fill). */
+export const RACK_LEDS = 3 * 16 * 3;
+
+function serverRacks(drive) {
   const p = PLATFORMS.west;
   const group = new THREE.Group();
   const H = 3.6;
@@ -532,13 +758,40 @@ function serverRacks() {
     group.add(power);
   }
   group.add(leds);
-  group.add(merged(strips, neon(P.neonCyan, 2.0)));
-  return { group, anchor: v3(x, p.top + H + 0.6, zs[1]) };
+  const stripMat = neon(P.neonCyan, 2.0, { own: true });
+  group.add(merged(strips, stripMat));
+
+  // Fill order: the bottom row of all three racks first, then upwards (so they drain top to bottom).
+  const order = [];
+  for (let row = 0; row < rows; row++) {
+    for (let cab = 0; cab < zs.length; cab++) {
+      for (let col = 0; col < cols; col++) order.push(cab * rows * cols + row * cols + col);
+    }
+  }
+  const lit = new THREE.Color(P.okGreen).multiplyScalar(2.4);
+  const c = new THREE.Color();
+  return {
+    group,
+    anchor: v3(x, p.top + H + 0.6, zs[1]),
+    core: v3(x + 0.6, p.top + H / 2, zs[1]),
+    hover: v3(x + 2.0, p.top + H + 0.9, zs[1] + 1.2),
+    tick(t) {
+      // LEDs lit = context fill (drive.rack.lit LEDs, eased); compaction flashes the strips.
+      const on = drive.rack.lit;
+      for (let r = 0; r < order.length; r++) {
+        const f = Math.max(0, Math.min(1, on - r));
+        if (f > 0) c.copy(lit).multiplyScalar(0.85 + 0.15 * Math.sin(t * (2 + (r % 5)) + r * 1.7));
+        leds.setColorAt(order[r], f > 0 ? c.lerpColors(off, c, f) : off);
+      }
+      leds.instanceColor.needsUpdate = true;
+      setGlow(stripMat, P.neonCyan, 2.0 * (1 + drive.rack.flash * (0.9 + 0.9 * Math.sin(t * 14))));
+    },
+  };
 }
 
 // ---- Data falls: two cyan waterfalls pouring into glowing basins ----
 
-function dataFalls() {
+function dataFalls(drive) {
   const group = new THREE.Group();
   const ticks = [];
 
@@ -554,7 +807,7 @@ function dataFalls() {
       mesh.position.set(x, (yTop + yBottom) / 2, z);
       mesh.rotation.y = FACE_CAMERA;
       group.add(mesh);
-      ticks.push((t) => { tex.offset.y = t * speed; });
+      ticks.push((dt) => { tex.offset.y = (tex.offset.y + dt * speed * drive.falls) % 1; });
     }
     const splash = glowSprite(P.neonCyan, 1.8, 0.6);
     splash.position.set(x, yBottom + 0.1, z);
@@ -575,7 +828,7 @@ function dataFalls() {
     water.rotation.x = -Math.PI / 2;
     water.position.set(x, y + 0.32, z);
     group.add(water);
-    ticks.push((t) => { water.rotation.z = -t * 0.4; });
+    ticks.push((dt) => { water.rotation.z -= dt * 0.4 * drive.falls; });
   };
 
   // South fall: from the pipe outlet under the main platform into a basin far below.
@@ -616,13 +869,14 @@ function dataFalls() {
     group,
     anchor: v3(fx, tower.y + tH + 0.8, fz),
     bounds: [low.clone()], // the lower basin (its front may hide behind the Hook Flow panel)
-    tick: (t, dt) => { for (const f of ticks) f(t, dt); },
+    // Speed follows the activity rate (events in the last minute): slow when idle.
+    tick: (t, dt) => { for (const f of ticks) f(dt); },
   };
 }
 
 // ---- Portal rings: a big one floating above the racks, a small one on a pipe ----
 
-function portals() {
+function portals(drive) {
   const group = new THREE.Group();
   const spinners = [];
   const ring = (x, y, z, r, outer, innerColor) => {
@@ -645,20 +899,27 @@ function portals() {
     core.rotation.x = -Math.PI / 2;
     g.add(core);
     group.add(g);
-    spinners.push({ g, dash, y });
+    spinners.push({ g, dash, core, y });
   };
   const big = v3(-4.4, 5.1, -4.2);
   ring(big.x, big.y, big.z, 2.0, P.neonMagenta, P.neonCyan);
   ring(-8.6, 4.67, -0.1, 0.85, P.neonPurple, P.neonMagenta);
 
+  let spin = 0;
   return {
     group,
     anchor: v3(big.x, big.y + 1.0, big.z),
+    core: big.clone(),
+    hover: big.clone(), // helper bots rise out of here (helpers.js)
     bounds: [big.clone().add(v3(-1.5, 0.3, -1.5))], // far rim of the big ring
-    tick(t) {
-      spinners.forEach(({ g, dash, y }, i) => {
-        dash.rotation.z = t * (i ? -0.5 : 0.3);
+    tick(t, dt) {
+      // Subagents: the rings spin faster, the core flares when a helper comes or goes.
+      const a = drive.act.portal;
+      spin += dt * (1 + 3 * a);
+      spinners.forEach(({ g, dash, core, y }, i) => {
+        dash.rotation.z = spin * (i ? -0.5 : 0.3);
         g.position.y = y + Math.sin(t * 0.8 + i * 2) * 0.08;
+        core.material.opacity = 0.45 + 0.3 * a + 0.5 * drive.portalFlash;
       });
     },
   };
@@ -666,7 +927,7 @@ function portals() {
 
 // ---- Arcade cabinet (the character plays here when idle, stage 4) ----
 
-function arcade() {
+function arcade(drive) {
   const p = PLATFORMS.west;
   const group = new THREE.Group();
   group.position.set(-7.25, p.top, 1.65);
@@ -677,15 +938,17 @@ function arcade() {
   const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.85, 0.72), bodyMat);
   body.position.y = 0.925;
   group.add(body);
-  const marquee = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.24, 0.16), neon(P.neonMagenta, 2.4));
+  const marquee = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.24, 0.16), neon(P.neonMagenta, 2.4, { own: true }));
   marquee.position.set(0, 1.82, 0.3);
   group.add(marquee);
   const bezel = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.58, 0.04), solid(0x0b0614, { roughness: 0.7, metalness: 0.2 }));
   bezel.position.set(0, 1.32, 0.35);
   bezel.rotation.x = -0.12;
   group.add(bezel);
+  const game = TEX.arcade.clone();
+  game.wrapS = THREE.RepeatWrapping;
   const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.48), new THREE.MeshBasicMaterial({
-    map: TEX.arcade, color: new THREE.Color(0xffffff).multiplyScalar(1.7),
+    map: game, color: new THREE.Color(0xffffff).multiplyScalar(1.7),
   }));
   screen.position.set(0, 1.32, 0.375);
   screen.rotation.x = -0.12;
@@ -717,7 +980,20 @@ function arcade() {
   glow.position.set(0, 1.4, 0.6);
   group.add(glow);
 
-  return { group, anchor: localPoint(group, 0, 2.4, 0) };
+  return {
+    group,
+    anchor: localPoint(group, 0, 2.4, 0),
+    core: localPoint(group, 0, 1.3, 0.3),
+    hover: localPoint(group, 0.3, 2.6, 1.0),
+    tick(t) {
+      // After a finished turn the agent plays: the screen lights up and the invaders march.
+      const a = drive.act.arcade;
+      screen.material.color.setScalar(0.7 + 1.2 * a);
+      game.offset.x = a > 0.5 ? ((Math.floor(t * 2.5) % 4) - 1.5) / 32 : 0;
+      setGlow(marquee.material, P.neonMagenta, 2.4 * (0.7 + a * (0.45 + 0.25 * Math.sin(t * 6))));
+      glow.material.opacity = 0.2 + 0.25 * a;
+    },
+  };
 }
 
 // ---- Decor: plants, canister, console box ----
@@ -742,7 +1018,7 @@ function decor() {
   group.add(canister);
 
   const box = new THREE.Group();
-  box.position.set(2.3, 0, -2.4);
+  box.position.set(3.1, 0, -1.1); // clear of the walk to the board (walk.js)
   box.scale.setScalar(1.25);
   const body = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.86, 0.62), MAT.hull);
   body.position.y = 0.43;
