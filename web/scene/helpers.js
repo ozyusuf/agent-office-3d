@@ -3,7 +3,7 @@
 // circles the portal while it thinks, and flies back down into the portal (SubagentStop).
 
 import * as THREE from 'three';
-import { P, TAU, FACE_CAMERA, neon, solid, glowSprite, flatRing } from './kit.js';
+import { P, TAU, FACE_CAMERA, neon, solid, glowSprite, flatRing, trackAccent } from './kit.js';
 import { stationForKind } from '../stations.js';
 
 const MAX_BOTS = 8;
@@ -55,6 +55,7 @@ export function buildHelpers(scene, { portal, hovers }, onPortal) {
     g.add(jet);
     g.visible = false;
     scene.add(g);
+    trackAccent(g); // built after the scene: takes the current accent colour
     return { g, jet, pos: new THREE.Vector3(), seed: Math.random() * TAU };
   }
 

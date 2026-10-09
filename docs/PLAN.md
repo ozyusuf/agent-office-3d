@@ -65,10 +65,10 @@ stops drawing when hidden, and all labels track their stations.
 stop) plays out visibly on screen with correct stations and no stuck states.
 
 ## Stage 5 - Personalisation and settings
-- [ ] Settings panel (opened from the top-right icon): agent name, realm title + subtitle, language,
-      accent colour, bloom on/off, pixel ratio cap, context bar scale
-- [ ] Settings persist (server-side config file) and apply live without reload
-- [ ] Accent colour re-tints neon materials and HUD tokens
+- [x] Settings panel (opened from the top-right icon): agent name, realm title + subtitle, language,
+      accent colour, bloom on/off, pixel ratio cap, context bar scale (= context window, D55), sky
+- [x] Settings persist (server-side config file) and apply live without reload
+- [x] Accent colour re-tints neon materials and HUD tokens
 
 **Done when:** every setting changes the screen live and survives a server restart.
 

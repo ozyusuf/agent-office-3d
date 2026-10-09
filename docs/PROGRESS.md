@@ -1,14 +1,52 @@
 # Progress
 
 ## Current state
-- **Stage 4 done** (verified 2026-10-09). Next: **Stage 5 - personalisation and settings.**
+- **Stage 5 done** (verified 2026-10-09) + a free redesign (the sky realm, D49-D57).
+  Next: **Stage 6 - install, docs, release.**
 - Run: `npm install`, `npm start`, open http://127.0.0.1:7847 (HUD) or /debug.html (raw events).
   Restart the server after pulling new server code (an old `node server/index.js` keeps running
-  the old code; stage 4 changed the state snapshot).
-- Local `config.json` (gitignored) sets language, `bloom`, `pixelRatioCap` etc.; XP lives in
-  `data/stats.json` (gitignored).
+  the old code). `?hour=0..24` fixes the sky's time for one tab.
+- Settings: gear icon -> saved to `config.json` (gitignored; the port is set there by hand). XP lives
+  in `data/stats.json` (gitignored).
 
 ## Session log (newest first)
+
+### 2026-10-09 - Session 5 - Stage 5 (settings) + redesign
+**Done**
+- Stage 5: settings panel from the gear (`web/settings.js`): agent name, title, subtitle, language,
+  accent colour (presets + any colour), sky, bloom, pixel ratio, context window, time-bar scale.
+  `POST /config` (same-origin Origin + header + JSON, all-or-nothing validation, port not editable,
+  other keys kept, atomic write) -> `config` broadcast to every tab (D46-D48). Accent re-tints HUD
+  tokens and every 3D colour built in the base cyan (D47).
+- Redesign 1 (user: "looks like AI slop"): light is information (stations rest dim, light up while
+  working), HUD as an instrument (no glow boxes, Bahnschrift small caps, segmented meters, callout
+  labels with leader lines, XP ring, skill rail) (D49-D53).
+- Redesign 2 (user away, free hand): the sky realm - rock islands over a sea of clouds, sky follows
+  the local time (`daylight.js` + `sky.js`), fireflies, shooting star on Stop, storm on StopFailure,
+  level-up sparks + banner, nameplate hidden without a character, reduced motion respected (D54,
+  D56, D57). Context meter shows real tokens from the session transcript (`server/transcript.js`,
+  window auto 200k/1M, tool-call fallback); rack LEDs follow it (D55).
+- Tests: 72 pass (config update/save, accent tracking, daylight, transcript/context, state).
+- Checks (scratch server 7861 + scratch config/data; test events never sent to the user's server):
+  security probes on `/config` (foreign Origin, no header, wrong Host, text/plain, port, bad value);
+  17-step two-window browser check (every setting live in the other tab, Enter saves, invalid
+  value refused, offline edit saved after reconnect); restart keeps every setting; screenshots of all
+  states at night / dawn / noon / sunset / 11:00, 420 / 600 / 702x765 widths, storm, level up,
+  shooting star, reduced motion; real transcript of this session read as 573k / 1M.
+
+**Left:** stage 6.
+
+**Known issues / open questions**
+- The transcript's JSONL format is not documented and may lag a step; if it cannot be read the
+  context meter falls back to tool calls. The context window is not in the transcript: auto =
+  200k, or 1M once more is used (the setting can fix it).
+- fps measured only in headless Edge (45-55); a check in the user's real browser is still open.
+- Permission denied in the dialog still fires no hook ("waiting" stays until the next event).
+- Helper bots and real subagents only tested with documented-format fake events.
+
+**Next step:** `/next` -> Stage 6. First tasks: install script (back up `~/.claude/settings.json`, show
+the diff, merge hooks only after explicit approval; uninstall restores the backup), then README
+with screenshots (day / sunset / night / storm) and the "how it was built" guide.
 
 ### 2026-10-09 - Session 4 - Stage 4 (events -> animations)
 **Done**

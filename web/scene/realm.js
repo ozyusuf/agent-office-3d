@@ -9,13 +9,18 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildWorld, neonEnvironment } from './world.js';
+import { buildWorld, neonEnvironment, LAMP } from './world.js';
 import { buildProps, RACK_LEDS } from './props.js';
 import { buildCharacter } from './character.js';
 import { buildHelpers } from './helpers.js';
-import { P, ease } from './kit.js';
+import { buildSky } from './sky.js';
+import { createEffects } from './effects.js';
+import { mixHex } from './daylight.js';
+import { P, ease, trackAccent, setAccent } from './kit.js';
+import { accentPair } from '../palette.js';
 import { createDirector, eventRate, fallsSpeed, rackTarget, powerOf, alertOf, RATE_WINDOW_MS } from './director.js';
 import { stationForKind } from '../stations.js';
+import { contextFill } from '../context.js';
 
 const ELEVATION = THREE.MathUtils.degToRad(35); // camera looks down 35°
 const YAW = Math.PI / 4; // and from 45° (+x +z), so axis-aligned platforms read as diamonds
@@ -58,6 +63,7 @@ export function createRealm(container, options) {
     portalFlash: 0, // a helper came out of / went into the portal
     power: 0, // 0 = standby (no session, or it ended), 1 = running
     alert: 0, // red alert after StopFailure
+    rest: 0, // the turn is over: the workshop lights go a little lower
     waiting: 0, // waiting for permission (yellow light)
     falls: fallsSpeed(0), // data fall speed from the activity rate
     rack: { lit: 0, flash: 0 }, // rack LEDs lit (context fill), compaction flash
@@ -71,13 +77,19 @@ export function createRealm(container, options) {
   const helpers = buildHelpers(scene, { portal: props.hovers.portal, hovers: props.hovers }, () => {
     drive.portalFlash = 1;
   });
-  const ticks = [...world.ticks, ...props.ticks, character.tick, helpers.tick];
+  scene.add(camera); // the sky's camera-space layers (gradient, stars, sun, moon) are its children
+  // Reduced motion: the sky keeps still (no drift, twinkle, shooting stars or lightning), no sparks.
+  const calm = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  const sky = buildSky(scene, camera, { hour: options.hour, calm });
+  const effects = createEffects(scene, { calm });
+  const ticks = [...world.ticks, ...props.ticks, character.tick, helpers.tick, ...sky.ticks, effects.tick];
+  trackAccent(scene); // everything built in the base cyan follows the accent colour from now on
 
   const anchors = { ...props.anchors, character: new THREE.Vector3() };
   character.headWorld(anchors.character);
 
   let focus = null; // the server's focus session
-  let contextBarMax = 150;
+  let config = {}; // contextWindow / contextBarMax: how full the context is (rack LEDs)
   const times = []; // hook times of recent events, for the activity rate
 
   /** Session state -> drive values (eased), character goal, exposure and station lights. */
@@ -97,31 +109,61 @@ export function createRealm(container, options) {
     drive.portalFlash = Math.max(0, drive.portalFlash - dt / 0.8);
     drive.power = ease(drive.power, powerOf(focus), dt, 0.5);
     drive.alert = ease(drive.alert, alertOf(focus), dt, 0.35);
+    sky.setStorm(drive.alert); // an API error is a storm over the realm
     drive.waiting = ease(drive.waiting, focus?.status === 'waiting' ? 1 : 0, dt, 0.3);
+    drive.rest = ease(drive.rest, focus?.status === 'idle' ? 1 : 0, dt, 1.2);
     while (times.length && now - times[0] > RATE_WINDOW_MS) times.shift();
     drive.falls = ease(drive.falls, fallsSpeed(eventRate(times, now)), dt, 1.5);
     // LEDs fill and drain at most 96 per second (a full drain takes 1.5 s).
-    const lit = rackTarget(focus, contextBarMax, RACK_LEDS);
+    const lit = rackTarget(focus, contextFill(focus, config), RACK_LEDS);
     drive.rack.lit += Math.sign(lit - drive.rack.lit) * Math.min(Math.abs(lit - drive.rack.lit), dt * 96);
     drive.rack.flash = ease(drive.rack.flash, focus?.compacting ? 1 : 0, dt, 0.25);
     drive.board = director.board(focus);
-    // Standby and "lights out" dim the whole scene; the red alert rims stay bright.
-    renderer.toneMappingExposure = EXPOSURE * (0.42 + 0.58 * drive.power) * (1 - 0.6 * drive.alert);
+    // Standby and "lights out" dim the whole scene (the red alert rims stay bright); a finished
+    // turn lowers the lights a little, so the arcade stands out.
+    renderer.toneMappingExposure = EXPOSURE * skyExposure * (0.42 + 0.58 * drive.power) * (1 - 0.6 * drive.alert) * (1 - 0.16 * drive.rest)
+      * (1 + 0.8 * sky.flash());
     for (const [key, { light, base }] of Object.entries(world.lights)) {
       const a = key === 'racks' ? Math.max(drive.act.racks, drive.act.arcade) : drive.act[key];
-      light.intensity = base * (0.8 + 0.6 * a);
+      light.intensity = base * (0.45 + 1.0 * a); // light pools where the work is
     }
     // Waiting for permission: the light over the desk turns yellow (with the HUD's yellow tint).
     const desk = world.lights.desk;
-    desk.light.color.setHex(P.neonCyan).lerp(warnYellow, drive.waiting);
+    desk.light.color.setHex(LAMP).lerp(warnYellow, drive.waiting);
     desk.light.intensity *= (1 + 0.8 * drive.waiting * (0.6 + 0.4 * Math.sin(now / 160)));
   }
   const warnYellow = new THREE.Color(P.warnYellow);
 
+  // Time of day: the ambient lights, the exposure and the reflections follow the sky (sky.js).
+  let accentShown = P.neonCyan;
+  let envTimer = null;
+  let skyExposure = 1;
+  let envHour = -99;
+  const sunRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).setY(0).normalize();
+  const sunBack = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 2).setY(0).normalize();
+  sky.onChange((s) => {
+    const { hemi, key, fill } = world.ambient;
+    hemi.color.setHex(mixHex(0x34425f, 0xc6d9f0, s.day));
+    hemi.groundColor.setHex(mixHex(0x08070c, mixHex(0x707688, s.lit, 0.3), s.day)); // light bounced off the clouds
+    hemi.intensity = 1.05 + 1.15 * s.day;
+    key.color.setHex(mixHex(0xb6c3e4, mixHex(0xfff2df, 0xffb27a, s.warm), Math.min(1, s.sun)));
+    key.intensity = 0.85 + 1.6 * s.day;
+    // The sun or moon lights the realm from where it stands in the sky.
+    key.position.copy(sunRight).multiplyScalar(s.orbit.x * 9).addScaledVector(sunBack, 3).setY(5 + 9 * s.orbit.y);
+    fill.color.setHex(mixHex(0x56649a, 0x9db4dc, s.day));
+    fill.intensity = 0.3 + 0.35 * s.day;
+    skyExposure = 1 - 0.06 * s.day;
+    if (Math.abs(s.hour - envHour) > 0.25) {
+      envHour = s.hour;
+      rebuildEnvironment();
+    }
+    options.onSky?.(s);
+  });
+
   // Postprocessing: render -> bloom -> output (tone mapping + sRGB).
   const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType }));
   composer.addPass(new RenderPass(scene, camera));
-  const bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.6, 0.4, 0.9);
+  const bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.75, 0.5, 0.85); // only working stations cross the threshold
   composer.addPass(bloomPass);
   composer.addPass(new OutputPass());
 
@@ -184,8 +226,10 @@ export function createRealm(container, options) {
     const dy = -(rect.top + rect.height / 2 - h / 2) / ppu;
     aimCamera(right.multiplyScalar(across.mid - dx).add(up.multiplyScalar(tall.mid - dy)));
     // Fog: things far below and far behind the platforms fade into the void.
-    scene.fog.near = DISTANCE + 2;
-    scene.fog.far = DISTANCE + 13;
+    // Fog only reaches what lies far behind or deep below the islands (pipes sinking into the clouds).
+    scene.fog.near = DISTANCE + 12;
+    scene.fog.far = DISTANCE + 34;
+    sky.reframe();
   }
 
   // ---- Loop ----
@@ -238,12 +282,19 @@ export function createRealm(container, options) {
   start();
 
   const point = new THREE.Vector3();
+
+  /** Reflections: the neon room lit by the current accent and sky. */
+  function rebuildEnvironment() {
+    const old = scene.environment;
+    scene.environment = neonEnvironment(renderer, accentShown, mixHex(0x2a3d70, sky.sky.horizon, 0.25 + 0.5 * sky.sky.day));
+    old?.dispose();
+  }
   return {
     anchors,
     /** Server snapshot ({ stats, liveSessions, focus }) and config, after every event. */
-    setState(state, config) {
+    setState(state, cfg) {
       focus = state?.focus ?? null;
-      if (config?.contextBarMax > 0) contextBarMax = config.contextBarMax;
+      if (cfg) config = cfg;
       helpers.sync(focus && focus.status !== 'ended' ? focus.helpers : []);
     },
     /** Events replayed on connect: only used for the activity rate (no reactions). */
@@ -263,6 +314,7 @@ export function createRealm(container, options) {
         drive.act[station] = Math.min(drive.act[station], 0.15);
       }
       if (e.event === 'UserPromptSubmit' || e.event === 'SessionStart') drive.prompt = 1;
+      if (e.event === 'Stop' && !e.agentId) sky.shootingStar(); // a finished turn, if the stars are out
     },
     /** World point -> CSS pixel position in the window. */
     project(world) {
@@ -270,10 +322,25 @@ export function createRealm(container, options) {
       return { x: (point.x + 1) * size.w / 2, y: (1 - point.y) * size.h / 2 };
     },
     reframe: frame,
+    /** The level went up (real XP): sparks out of the character. */
+    levelUp: () => effects.levelUp(character.root.position),
+    /** The sky setting changed: show the new time of day at once. */
+    refreshSky: () => sky.update(),
     /** Current scene scale: CSS pixels per world unit. */
     pixelsPerUnit: () => ppu,
     setBloom(on) { bloom = on; },
+    /** Accent colour ("#rrggbb"): recolours the neon at once, the reflections a moment later. */
+    setAccent(hex) {
+      const pair = accentPair(hex);
+      if (pair.main === accentShown) return;
+      accentShown = pair.main;
+      setAccent(pair);
+      // Rebuilding the reflection map takes a few ms: once, after the colour picker settles.
+      clearTimeout(envTimer);
+      envTimer = setTimeout(rebuildEnvironment, 250);
+    },
     setPixelRatioCap(cap) {
+      if (cap === pixelRatioCap) return;
       pixelRatioCap = cap;
       frame();
     },

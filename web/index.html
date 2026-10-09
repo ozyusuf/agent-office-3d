@@ -12,7 +12,8 @@
   </script>
 </head>
 <body>
-  <!-- Layers, bottom to top: three.js canvas, state tint, labels that follow 3D stations, frame, HUD panels. -->
+  <!-- Layers, bottom to top: three.js canvas, state tint, labels (with leader lines) that follow 3D
+       stations, edge scrims that keep the HUD legible, HUD. No boxes: the scene runs full-bleed. -->
   <div id="scene" class="scene" aria-hidden="true"></div>
   <div id="tint" class="tint" aria-hidden="true"></div>
   <div class="labels" id="labels">
@@ -20,97 +21,154 @@
       <div class="lvl" id="lvl-badge"><span class="lvl-k" data-i18n="lvl"></span><span class="lvl-n" id="lvl">–</span></div>
       <div class="char-info">
         <div class="char-line" id="char-line"></div>
-        <div class="xp"><span class="fill" id="xp-fill"></span></div>
         <div class="xp-text" id="xp-text"></div>
       </div>
     </div>
   </div>
-  <div class="frame" aria-hidden="true"></div>
+  <div class="levelup" id="levelup" role="status" hidden><span class="levelup-k" data-i18n="levelUp"></span><span class="levelup-n" id="levelup-n"></span></div>
+  <div class="scrim scrim-top" aria-hidden="true"></div>
+  <div class="scrim scrim-bottom" aria-hidden="true"></div>
 
   <div class="hud">
     <header class="top">
-      <section class="panel stats" id="stats" data-status="none" aria-live="polite">
-        <div class="stats-status"><span class="dot"></span><span id="status-text"></span></div>
-        <div class="stats-head"><span data-i18n="session"></span><span class="num" id="tools-done"></span></div>
-        <p class="stats-empty" id="stats-empty"></p>
-        <div class="meters" id="meters" hidden>
-          <div class="meter" data-meter="context">
-            <span class="label" data-i18n="context"></span><span class="value"></span>
-            <span class="track"><span class="fill"></span></span>
-          </div>
-          <div class="meter" data-meter="effort">
-            <span class="label" data-i18n="effort"></span><span class="value"></span>
-            <span class="track"><span class="fill"></span></span>
-          </div>
-          <div class="meter" data-meter="time">
-            <span class="label" data-i18n="time"></span><span class="value"></span>
-            <span class="track"><span class="fill"></span></span>
-          </div>
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 20 7.4v9.2L12 21.2 4 16.6V7.4z"/><path d="M4 7.4 12 12l8-4.6M12 12v9.2"/></svg>
+        <div class="brand-text">
+          <h1 id="realm-title"></h1>
+          <div id="realm-subtitle" hidden></div>
         </div>
-      </section>
-
-      <div class="banner">
-        <h1 class="plate banner-title" id="realm-title"></h1>
-        <div class="plate banner-sub" id="realm-subtitle" hidden></div>
       </div>
 
-      <nav class="panel icons">
-        <span class="icon" id="icon-conn" data-state="connecting" role="img">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 10a11 11 0 0 1 15 0M7.5 13.5a6.5 6.5 0 0 1 9 0"/><circle cx="12" cy="17.5" r="1.8" fill="currentColor" stroke="none"/></svg>
-        </span>
-        <span class="icon" id="icon-session" data-state="none" role="img">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12.5h4l2.5-6 4 11 2.5-5H21"/></svg>
-        </span>
-        <button class="icon" id="icon-settings" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="settings">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>
+      <nav class="icons">
+        <div class="status" id="icon-session" data-state="none">
+          <span class="dot"></span><span id="status-text"></span><span class="tools" id="tools-done"></span>
+        </div>
+        <span class="conn" id="icon-conn" data-state="connecting" role="img"></span>
+        <button class="gear" id="icon-settings" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2.6"/><path d="M12 3.5v2.6M12 17.9v2.6M3.5 12h2.6M17.9 12h2.6M6 6l1.8 1.8M16.2 16.2 18 18M6 18l1.8-1.8M16.2 7.8 18 6"/></svg>
         </button>
-        <div class="panel popover" id="settings" hidden>
-          <div class="popover-title" data-i18n="settings"></div>
-          <div class="popover-row">
-            <span data-i18n="language"></span>
-            <span class="seg-buttons">
-              <button type="button" data-lang="tr">TR</button>
-              <button type="button" data-lang="en">EN</button>
-            </span>
-          </div>
-          <div class="popover-row" id="row-bloom">
-            <span data-i18n="bloom"></span>
-            <span class="seg-buttons">
-              <button type="button" data-bloom="1" data-i18n="on"></button>
-              <button type="button" data-bloom="0" data-i18n="off"></button>
-            </span>
-          </div>
-          <div class="popover-row" id="row-pr">
-            <span data-i18n="pixelRatio"></span>
-            <span class="seg-buttons">
-              <button type="button" data-pr="1">1×</button>
-              <button type="button" data-pr="1.5">1.5×</button>
-              <button type="button" data-pr="2">2×</button>
-            </span>
-          </div>
+        <!-- Settings panel (web/settings.js): every field is saved to config.json and applied live. -->
+        <div class="popover" id="settings" role="group" aria-labelledby="settings-title" hidden>
+          <div class="popover-title" id="settings-title" data-i18n="settings"></div>
+
+          <section class="set-group">
+            <h3 class="set-head" data-i18n="set.names"></h3>
+            <label class="field"><span data-i18n="set.agentName"></span>
+              <input type="text" data-key="agentName" maxlength="40" spellcheck="false" autocomplete="off" data-i18n-placeholder="set.nameNone"></label>
+            <label class="field"><span data-i18n="set.realmTitle"></span>
+              <input type="text" data-key="realmTitle" maxlength="48" spellcheck="false" autocomplete="off" placeholder="agent-office-3d"></label>
+            <label class="field"><span data-i18n="set.realmSubtitle"></span>
+              <input type="text" data-key="realmSubtitle" maxlength="48" spellcheck="false" autocomplete="off" data-i18n-placeholder="set.subtitleAuto"></label>
+            <div class="popover-row">
+              <span data-i18n="language"></span>
+              <span class="seg-buttons">
+                <button type="button" data-key="language" data-value="tr">TR</button>
+                <button type="button" data-key="language" data-value="en">EN</button>
+              </span>
+            </div>
+          </section>
+
+          <section class="set-group">
+            <h3 class="set-head" data-i18n="set.accentColor"></h3>
+            <div class="swatches">
+              <button type="button" class="swatch" data-key="accentColor" data-value="#33b7de" data-i18n-title="color.cyan" style="--swatch: #33b7de"></button>
+              <button type="button" class="swatch" data-key="accentColor" data-value="#4d8dff" data-i18n-title="color.blue" style="--swatch: #4d8dff"></button>
+              <button type="button" class="swatch" data-key="accentColor" data-value="#9b6bff" data-i18n-title="color.violet" style="--swatch: #9b6bff"></button>
+              <button type="button" class="swatch" data-key="accentColor" data-value="#e350a4" data-i18n-title="color.magenta" style="--swatch: #e350a4"></button>
+              <button type="button" class="swatch" data-key="accentColor" data-value="#56d999" data-i18n-title="color.green" style="--swatch: #56d999"></button>
+              <button type="button" class="swatch" data-key="accentColor" data-value="#f1ad56" data-i18n-title="color.orange" style="--swatch: #f1ad56"></button>
+              <label class="swatch swatch-custom"><input type="color" data-key="accentColor" data-i18n-title="set.accentCustom"></label>
+            </div>
+          </section>
+
+          <section class="set-group">
+            <h3 class="set-head" data-i18n="set.sky"></h3>
+            <div class="seg-buttons seg-wide">
+              <button type="button" data-key="sky" data-value="clock" data-i18n="sky.clock"></button>
+              <button type="button" data-key="sky" data-value="dawn" data-i18n="sky.dawn"></button>
+              <button type="button" data-key="sky" data-value="day" data-i18n="sky.day"></button>
+              <button type="button" data-key="sky" data-value="dusk" data-i18n="sky.dusk"></button>
+              <button type="button" data-key="sky" data-value="night" data-i18n="sky.night"></button>
+            </div>
+            <p class="popover-hint" data-i18n="set.skyNote"></p>
+          </section>
+
+          <section class="set-group" id="set-3d">
+            <h3 class="set-head" data-i18n="set.graphics"></h3>
+            <div class="popover-row">
+              <span data-i18n="bloom"></span>
+              <span class="seg-buttons">
+                <button type="button" data-key="bloom" data-value="true" data-i18n="on"></button>
+                <button type="button" data-key="bloom" data-value="false" data-i18n="off"></button>
+              </span>
+            </div>
+            <div class="popover-row">
+              <span data-i18n="pixelRatio"></span>
+              <span class="seg-buttons">
+                <button type="button" data-key="pixelRatioCap" data-value="1">1×</button>
+                <button type="button" data-key="pixelRatioCap" data-value="1.5">1.5×</button>
+                <button type="button" data-key="pixelRatioCap" data-value="2">2×</button>
+              </span>
+            </div>
+          </section>
           <p class="popover-fps" id="fps"></p>
-          <a class="popover-link" href="debug.html" target="_blank" rel="noopener" data-i18n="debugView"></a>
+
+          <section class="set-group">
+            <h3 class="set-head" data-i18n="set.bars"></h3>
+            <div class="popover-row">
+              <span data-i18n="set.contextWindow"></span>
+              <span class="seg-buttons">
+                <button type="button" data-key="contextWindow" data-value="auto" data-i18n="ctx.auto"></button>
+                <button type="button" data-key="contextWindow" data-value="200000">200k</button>
+                <button type="button" data-key="contextWindow" data-value="1000000">1M</button>
+              </span>
+            </div>
+            <label class="field field-num"><span data-i18n="set.sessionBarMinutes"></span>
+              <input type="number" data-key="sessionBarMinutes" min="5" max="1440" step="5" inputmode="numeric"></label>
+          </section>
+
+          <p class="save-status" id="save-status" aria-live="polite"></p>
           <p class="popover-note" data-i18n="settingsNote"></p>
+          <a class="popover-link" href="debug.html" target="_blank" rel="noopener" data-i18n="debugView"></a>
         </div>
       </nav>
     </header>
 
+    <!-- Instruments: context fill, effort, session time (all from the server snapshot). -->
+    <section class="instruments" id="stats" data-status="none" aria-live="polite">
+      <p class="stats-empty" id="stats-empty"></p>
+      <div class="meters" id="meters" hidden>
+        <div class="meter" data-meter="context">
+          <span class="label" data-i18n="context"></span><span class="value"></span>
+          <span class="track"><span class="fill"></span></span>
+        </div>
+        <div class="meter" data-meter="effort">
+          <span class="label" data-i18n="effort"></span><span class="value"></span>
+          <span class="track"><span class="fill"></span></span>
+        </div>
+        <div class="meter" data-meter="time">
+          <span class="label" data-i18n="time"></span><span class="value"></span>
+          <span class="track"><span class="fill"></span></span>
+        </div>
+      </div>
+    </section>
+
     <!-- Free area between the panels: the 3D scene is framed into it. -->
     <main class="middle" id="middle"></main>
 
-    <section class="panel log">
-      <h2 class="plate log-tab" data-i18n="hookFlow"></h2>
+    <section class="log">
+      <h2 class="log-tab" data-i18n="hookFlow"></h2>
       <ol class="log-lines" id="log"></ol>
       <p class="log-empty" id="log-empty"></p>
     </section>
 
-    <footer class="plate skills" id="skills">
-      <span class="skill" data-skill="read"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5.5" fill="currentColor" stroke="none"/></svg><span class="name"></span><span class="tag"></span></span>
-      <span class="skill" data-skill="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5.5" fill="currentColor" stroke="none"/></svg><span class="name"></span><span class="tag"></span></span>
-      <span class="skill" data-skill="edit"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" stroke="none" d="M12.3 2c.8 3.6 5.2 5.6 5.2 11a5.5 5.5 0 0 1-11 0c0-2.6 1.3-4.3 2.6-5.5.2 1.8 1 3 2.1 3.4-.2-3-.1-6 1.1-8.9z"/></svg><span class="name"></span><span class="tag"></span></span>
-      <span class="skill" data-skill="shell"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" stroke="none" d="M14 1.5 4.5 13.5h6.2L9 22.5l10.5-13h-6.4z"/></svg><span class="name"></span><span class="tag"></span></span>
+    <footer class="skills" id="skills">
+      <span class="skill" data-skill="read"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h8l4 4v13H6z"/><path d="M14 3.5v4h4M9 12h6M9 15.5h6"/></svg><span class="name"></span><span class="tag"></span></span>
+      <span class="skill" data-skill="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/></svg><span class="name"></span><span class="tag"></span></span>
+      <span class="skill" data-skill="edit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c1 3.5 5 5.2 5 10a5 5 0 0 1-10 0c0-2.3 1.2-3.8 2.4-4.9.3 1.6 1 2.6 2 3-.3-2.7 0-5.4.6-8.1z"/></svg><span class="name"></span><span class="tag"></span></span>
+      <span class="skill" data-skill="shell"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 7 5 5-5 5M12.5 17H19"/></svg><span class="name"></span><span class="tag"></span></span>
       <span class="skill" data-skill="web"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c3 2.8 3 14.2 0 17M12 3.5c-3 2.8-3 14.2 0 17"/></svg><span class="name"></span><span class="tag"></span></span>
-      <span class="skill" data-skill="permission"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" stroke="none" d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.8 2.2H4.2z"/><path d="M10 21a2.2 2.2 0 0 0 4 0"/></svg><span class="name"></span><span class="tag"></span></span>
+      <span class="skill" data-skill="permission"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.6 2H4.4z"/><path d="M10 21a2.2 2.2 0 0 0 4 0"/></svg><span class="name"></span><span class="tag"></span></span>
     </footer>
   </div>
 

@@ -3,12 +3,16 @@
 // with the scene in small windows, and step aside when they would overlap each other (the step aside
 // is eased, so labels glide instead of jumping while the character walks past). Without the scene
 // (no WebGL) they sit at the fixed stage 2 slots inside the HUD's middle area.
+// With the scene, every label floats a little above its anchor and a thin leader line with a dot
+// joins them, like a callout on a technical drawing; when a label steps aside, its leader follows.
 
 const EDGE = 6; // keep labels this far from the window edges
 const GAP = 4; // minimum space between two labels
 const FULL_SIZE_PPU = 40; // scene scale (CSS px per world unit) at which labels are full size
 const MIN_SCALE = 0.7;
 const GLIDE_S = 0.12; // time constant of the step-aside easing
+const STEM = 16; // leader length at full size: labels float this far above their anchor
+const SVG_NS = 'http://www.w3.org/2000/svg';
 
 export function createLabelLayer(layer, middle) {
   const sizes = new WeakMap(); // element -> cached { w, h } (reset when its text changes)
@@ -17,6 +21,49 @@ export function createLabelLayer(layer, middle) {
   let shownLast = new Set(); // labels placed in the previous update
   let lastUpdate = 0;
   let realm = null;
+
+  // Leader lines live in one SVG under the labels.
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.classList.add('leaders');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.dataset.placed = '';
+  layer.prepend(svg);
+  const leaders = new Map(); // label element -> { g, line, dot, drawn }
+
+  function leaderOf(el) {
+    let l = leaders.get(el);
+    if (!l) {
+      const g = document.createElementNS(SVG_NS, 'g');
+      g.dataset.station = el.dataset.station ?? el.dataset.anchor;
+      const line = document.createElementNS(SVG_NS, 'line');
+      const dot = document.createElementNS(SVG_NS, 'circle');
+      dot.setAttribute('r', '2');
+      g.append(line, dot);
+      svg.append(g);
+      l = { g, line, dot, drawn: '' };
+      leaders.set(el, l);
+    }
+    return l;
+  }
+
+  function drawLeader(item) {
+    const l = leaderOf(item.el);
+    const ax = Math.round(item.ax);
+    const ay = Math.round(item.ay);
+    const x = Math.round(item.x);
+    const y = Math.round(item.y);
+    const key = `${ax},${ay},${x},${y},${item.el.dataset.active}`;
+    l.g.style.display = '';
+    if (l.drawn === key) return;
+    l.drawn = key;
+    l.line.setAttribute('x1', ax);
+    l.line.setAttribute('y1', ay);
+    l.line.setAttribute('x2', x);
+    l.line.setAttribute('y2', y);
+    l.dot.setAttribute('cx', ax);
+    l.dot.setAttribute('cy', ay);
+    l.g.dataset.active = item.el.dataset.active ?? 'false';
+  }
 
   function size(el) {
     let s = sizes.get(el);
@@ -36,10 +83,14 @@ export function createLabelLayer(layer, middle) {
     const glide = 1 - Math.exp(-Math.min(0.1, (now - lastUpdate) / 1000) / GLIDE_S);
     lastUpdate = now;
     const scale = realm ? Math.min(1, Math.max(MIN_SCALE, realm.pixelsPerUnit() / FULL_SIZE_PPU)) : 1;
-    const rect = realm ? null : middle.getBoundingClientRect();
+    // The free middle area: labels stay inside it (the HUD has no boxes to hide them behind).
+    const rect = middle.getBoundingClientRect();
+    area.top = rect.top;
+    area.bottom = rect.bottom;
     const items = [];
+    const stem = realm ? STEM * scale : 0;
     for (const el of layer.children) {
-      if (el.hidden) continue;
+      if (el.hidden || el === svg) continue;
       let at;
       if (realm) {
         const anchor = realm.anchors[el.dataset.anchor];
@@ -52,18 +103,20 @@ export function createLabelLayer(layer, middle) {
         continue;
       }
       const { w, h } = size(el);
-      items.push({ el, ax: at.x, ay: at.y, x: at.x, y: at.y, w: w * scale, h: h * scale, rank: rank(el) });
+      // (ax, ay) = the anchor; (hx, hy) = where the label's bottom centre sits when nothing is in the way.
+      const hy = at.y - stem;
+      items.push({ el, ax: at.x, ay: at.y, hx: at.x, hy, x: at.x, y: hy, w: w * scale, h: h * scale, rank: rank(el) });
     }
     items.sort((a, b) => a.rank - b.rank);
     const placed = [];
     const shown = new Set();
     for (const item of items) {
-      clampX(item);
+      clamp(item);
       stepAside(item, placed);
       placed.push(item);
-      // Ease the offset from the anchor; a label that just appeared goes straight to its place.
-      const dx = item.x - item.ax;
-      const dy = item.y - item.ay;
+      // Ease the offset from home; a label that just appeared goes straight to its place.
+      const dx = item.x - item.hx;
+      const dy = item.y - item.hy;
       let off = offsets.get(item.el);
       if (!off || !shownLast.has(item.el)) {
         off = { dx, dy };
@@ -72,17 +125,22 @@ export function createLabelLayer(layer, middle) {
         off.dx += (dx - off.dx) * glide;
         off.dy += (dy - off.dy) * glide;
       }
-      item.x = item.ax + off.dx;
-      item.y = item.ay + off.dy;
+      item.x = item.hx + off.dx;
+      item.y = item.hy + off.dy;
       write(item, scale);
+      if (realm) drawLeader(item);
       shown.add(item.el);
     }
+    for (const [el, l] of leaders) if (!shown.has(el)) l.g.style.display = 'none';
     shownLast = shown;
   }
 
-  function clampX(item) {
+  const area = { top: 0, bottom: 0 };
+  function clamp(item) {
     const half = item.w / 2;
     item.x = Math.min(Math.max(item.x, half + EDGE), Math.max(half + EDGE, window.innerWidth - half - EDGE));
+    const minY = area.top + item.h + 2;
+    item.y = Math.min(Math.max(item.y, minY), Math.max(minY, area.bottom - 2));
   }
 
   // A label's box: centred on x, bottom edge on y (it hangs above its anchor point).
@@ -106,7 +164,7 @@ export function createLabelLayer(layer, middle) {
       const best = moves.reduce((a, b) => (Math.hypot(b.dx, b.dy) < Math.hypot(a.dx, a.dy) ? b : a));
       item.x += best.dx;
       item.y += best.dy;
-      clampX(item);
+      clamp(item);
     }
   }
 

@@ -6,7 +6,7 @@
 // station works. Anything that changes at runtime has a material of its own (`neon(..., { own })`).
 
 import * as THREE from 'three';
-import { P, TAU, FACE_CAMERA, rng, neon, solid, MAT, TEX, pipeGeometries, merged, glowSprite, flatRing, setGlow } from './kit.js';
+import { P, TAU, FACE_CAMERA, rng, neon, solid, MAT, TEX, pipeGeometries, merged, glowSprite, flatRing, setGlow, live, liveCss, lamp, brighten } from './kit.js';
 import { PLATFORMS } from './world.js';
 
 const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -79,8 +79,11 @@ function commandDesk(drive) {
   const dais = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.64, DAIS_TOP, 56), MAT.hull);
   dais.position.y = DAIS_TOP / 2;
   group.add(dais);
+  const deskLamps = [];
   for (const [r, tube, glow, y] of [[2.48, 0.035, 2.2, DAIS_TOP + 0.005], [1.62, 0.02, 1.2, DAIS_TOP + 0.005], [3.15, 0.026, 1.1, 0.01]]) {
-    const ring = flatRing(r, tube, neon(P.neonCyan, glow));
+    const material = lamp(P.neonCyan, glow);
+    deskLamps.push(material);
+    const ring = flatRing(r, tube, material);
     ring.position.y = y;
     group.add(ring);
   }
@@ -118,9 +121,10 @@ function commandDesk(drive) {
   const skirt = new THREE.Mesh(new THREE.CylinderGeometry(r1, r1 - 0.16, 0.34, 64, 1, true, a0, a1 - a0), MAT.hullDark);
   skirt.position.y = y - 0.29;
   group.add(skirt);
-  group.add(arcTube(r1 + 0.006, y + 0.006, a0, a1, 0.026, neon(P.neonCyan, 2.6)));
-  group.add(arcTube(r1 - 0.15, y - 0.46, a0 + 0.05, a1 - 0.05, 0.018, neon(P.neonCyan, 1.6)));
-  group.add(arcTube(r0 + 0.01, y + 0.006, a0, a1, 0.014, neon(P.neonCyan, 1.3)));
+  const consoleLamps = [lamp(P.neonCyan, 2.6), lamp(P.neonCyan, 1.6), lamp(P.neonCyan, 1.3)];
+  group.add(arcTube(r1 + 0.006, y + 0.006, a0, a1, 0.026, consoleLamps[0]));
+  group.add(arcTube(r1 - 0.15, y - 0.46, a0 + 0.05, a1 - 0.05, 0.018, consoleLamps[1]));
+  group.add(arcTube(r0 + 0.01, y + 0.006, a0, a1, 0.014, consoleLamps[2]));
 
   const posts = [];
   for (const a of [a0 + 0.3, Math.PI, a1 - 0.3]) {
@@ -163,7 +167,7 @@ function commandDesk(drive) {
   lid.position.set(0, 0.12, 0.12);
   lid.rotation.x = 0.25;
   laptop.add(lid);
-  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.2), neon(P.neonCyanSoft, 1.8));
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.2), neon(P.neonCyanSoft, 0.9));
   face.position.set(0, 0.12, 0.11);
   face.rotation.x = 0.25 + Math.PI;
   laptop.add(face);
@@ -178,10 +182,14 @@ function commandDesk(drive) {
     tick(t, dt) {
       // Other tools (MCP, skills, ...) make the holograms pulse; a new prompt flashes the dais.
       const busy = drive.act.desk;
+      const work = Math.max(busy, drive.typing);
       spin += dt * (0.15 + busy * 0.9 + drive.prompt * 2.5);
       dashes.rotation.z = spin;
-      setGlow(keys.material, P.neonCyan, 1.4 + drive.typing * (1.2 + 0.6 * Math.abs(Math.sin(t * 23))) + drive.prompt * 1.5);
-      for (const m of holos) m.color.setScalar(1.4 * (1 + busy * (0.6 + 0.4 * Math.sin(t * 9))));
+      dashes.material.opacity = 0.6 * (0.25 + 0.75 * Math.max(work, drive.prompt));
+      brighten(deskLamps, Math.max(work * 0.8, drive.prompt * 1.3));
+      brighten(consoleLamps, work + drive.prompt * 0.5, 0.42); // the agent's home: never quite dark
+      setGlow(keys.material, P.neonCyan, 0.5 + drive.typing * (1.4 + 0.6 * Math.abs(Math.sin(t * 23))) + drive.prompt * 1.5);
+      for (const m of holos) m.color.setScalar(0.8 * (1 + busy * (0.8 + 0.4 * Math.sin(t * 9))));
     },
   };
 }
@@ -261,7 +269,7 @@ function smelter(billboard, drive) {
   const panel = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.32, 0.1), MAT.hullDark);
   panel.position.set(0.55, 0.48, d / 2 + 0.04);
   group.add(panel);
-  const panelGlow = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.2), neon(P.warnYellow, 1.7));
+  const panelGlow = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.2), neon(P.warnYellow, 1.0));
   panelGlow.position.set(0.55, 0.48, d / 2 + 0.092);
   group.add(panelGlow);
 
@@ -440,6 +448,7 @@ function visionBoard(drive) {
   group.add(glow);
 
   let shown = null;
+  let tint = null; // the accent the ticker was drawn in
   return {
     group,
     anchor: localPoint(group, 1.1, yMid + H / 2 + 0.2, 0.2),
@@ -448,12 +457,13 @@ function visionBoard(drive) {
     tick(t, dt) {
       // Read / Grep / Glob / task tools: the screen brightens and the ticker shows what is used.
       const a = drive.act.board;
-      screen.material.color.setScalar(1.3 * (0.7 + 0.5 * a));
-      setGlow(frameMat, P.neonCyan, 2.6 * (0.7 + 0.5 * a));
-      setGlow(beam.material, P.neonCyan, 2.4 * (0.7 + 0.6 * a));
-      glow.material.opacity = 0.2 + 0.25 * a;
-      if (drive.board !== shown) {
+      screen.material.color.setScalar(0.48 + 0.95 * a);
+      setGlow(frameMat, P.neonCyan, 2.6 * (0.3 + 0.75 * a));
+      setGlow(beam.material, P.neonCyan, 2.4 * (0.3 + 0.8 * a));
+      glow.material.opacity = 0.06 + 0.32 * a;
+      if (drive.board !== shown || live(P.neonCyanSoft) !== tint) {
         shown = drive.board;
+        tint = live(P.neonCyanSoft);
         ticker.draw(shown);
       }
       strip.visible = a > 0.01 && Boolean(shown);
@@ -522,7 +532,7 @@ function tickerTexture() {
         g.fillStyle = '#f4c752';
         g.fillRect(x, 17, 28, 28);
       } else {
-        g.strokeStyle = '#4fc3e4';
+        g.strokeStyle = liveCss(P.neonCyanSoft);
         g.lineWidth = 3;
         g.strokeRect(x + 1.5, 18.5, 25, 25);
       }
@@ -540,13 +550,13 @@ function tickerTexture() {
       g.clearRect(0, 0, W, H);
       g.fillStyle = 'rgba(2, 8, 22, 0.94)';
       g.fillRect(0, 6, W, H - 12);
-      g.fillStyle = 'rgba(80, 200, 240, 0.9)';
+      g.fillStyle = liveCss(P.neonCyanSoft, 0.9);
       g.fillRect(0, 6, W, 2);
       g.fillRect(0, H - 8, W, 2);
       if (content) {
         g.font = '600 34px Consolas, "Cascadia Mono", monospace';
         g.textBaseline = 'middle';
-        g.shadowColor = 'rgba(80, 200, 240, 0.9)';
+        g.shadowColor = liveCss(P.neonCyanSoft, 0.9);
         g.shadowBlur = 8;
         if (content.todos) {
           chips(content.todos);
@@ -582,7 +592,8 @@ function centrifuge(drive) {
   const base = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.56, 0.4, 44), MAT.hull);
   base.position.y = 0.2;
   group.add(base);
-  const baseRim = flatRing(1.41, 0.035, neon(P.neonMagenta, 2.6));
+  const baseLamp = lamp(P.warnYellow, 2.2);
+  const baseRim = flatRing(1.41, 0.035, baseLamp);
   baseRim.position.y = 0.405;
   group.add(baseRim);
   const disc = new THREE.Mesh(new THREE.CircleGeometry(1.15, 44), new THREE.MeshBasicMaterial({
@@ -608,7 +619,7 @@ function centrifuge(drive) {
   }
   group.add(merged(yoke, MAT.trim));
 
-  const rings = [[P.neonMagenta, 2.6], [P.neonCyan, 2.5], [P.warnYellow, 2.4]].map(([color, intensity]) => (
+  const rings = [[P.fireOrange, 2.6], [P.neonCyan, 2.5], [P.warnYellow, 2.4]].map(([color, intensity]) => (
     { color, intensity, material: neon(color, intensity, { own: true }) }));
   const outer = new THREE.Group();
   outer.position.y = cy;
@@ -645,9 +656,11 @@ function centrifuge(drive) {
       inner.rotation.x = spin[1];
       inner.rotation.z = spin[2];
       disc.rotation.z = -spin[0] * 0.6;
-      for (const r of rings) setGlow(r.material, r.color, r.intensity * (0.8 + 0.55 * a));
-      setGlow(heart.material, P.neonCyanSoft, 1.5 * (0.8 + 1.0 * a));
-      halo.material.opacity = 0.3 + 0.4 * a;
+      for (const r of rings) setGlow(r.material, r.color, r.intensity * (0.09 + 1.26 * a));
+      brighten([baseLamp], a, 0.2);
+      disc.material.opacity = 0.25 + 0.75 * a;
+      setGlow(heart.material, P.neonCyanSoft, 1.5 * (0.3 + 1.4 * a));
+      halo.material.opacity = 0.06 + 0.55 * a;
     },
   };
 }
@@ -663,7 +676,7 @@ function orbitSphere(drive) {
   cup.translate(0, 2.74, 0);
   ped.push(cup);
   group.add(merged(ped, MAT.pipe));
-  const cupRim = flatRing(0.55, 0.028, neon(P.neonCyan, 2.4));
+  const cupRim = flatRing(0.55, 0.028, neon(P.neonCyan, 1.0));
   cupRim.position.y = 2.9;
   group.add(cupRim);
 
@@ -684,7 +697,7 @@ function orbitSphere(drive) {
     ring.rotation.set(tilt, 0, roll);
     const material = neon(color, 2.4, { own: true });
     ring.add(new THREE.Mesh(new THREE.TorusGeometry(r, 0.02, 6, 96), material));
-    const moon = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 8), neon(color, 2.8));
+    const moon = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 8), neon(color, 1.6));
     ring.add(moon);
     group.add(ring);
     rings.push({ moon, r, color, material, angle: rings.length * 2 });
@@ -704,9 +717,10 @@ function orbitSphere(drive) {
       rings.forEach((ring, i) => {
         ring.angle += dt * (0.5 + i * 0.3) * (1 + 3 * a);
         ring.moon.position.set(Math.cos(ring.angle) * ring.r, Math.sin(ring.angle) * ring.r, 0);
-        setGlow(ring.material, ring.color, 2.4 * (0.75 + 0.85 * a));
+        setGlow(ring.material, ring.color, 2.4 * (0.25 + 1.1 * a));
       });
-      atmo.material.opacity = 0.55 + 0.4 * a;
+      planet.material.color.setScalar(0.7 + 0.9 * a);
+      atmo.material.opacity = 0.2 + 0.6 * a;
     },
   };
 }
@@ -753,7 +767,7 @@ function serverRacks(drive) {
         n++;
       }
     }
-    const power = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), neon(P.okGreen, 3));
+    const power = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), neon(P.okGreen, 1.6));
     power.position.set(x + D / 2 + 0.01, p.top + H - 0.18, z - 0.42);
     group.add(power);
   }
@@ -784,7 +798,7 @@ function serverRacks(drive) {
         leds.setColorAt(order[r], f > 0 ? c.lerpColors(off, c, f) : off);
       }
       leds.instanceColor.needsUpdate = true;
-      setGlow(stripMat, P.neonCyan, 2.0 * (1 + drive.rack.flash * (0.9 + 0.9 * Math.sin(t * 14))));
+      setGlow(stripMat, P.neonCyan, 2.0 * (0.32 + drive.rack.flash * (1.2 + 0.9 * Math.sin(t * 14))));
     },
   };
 }
@@ -794,6 +808,9 @@ function serverRacks(drive) {
 function dataFalls(drive) {
   const group = new THREE.Group();
   const ticks = [];
+  const glows = []; // { material, opacity } faded with the activity rate
+  const rims = [];
+  let flow = 0; // 0 = no events in the last minute, 1 = busy
 
   const fall = (x, yTop, yBottom, z, width) => {
     const h = yTop - yBottom;
@@ -807,18 +824,22 @@ function dataFalls(drive) {
       mesh.position.set(x, (yTop + yBottom) / 2, z);
       mesh.rotation.y = FACE_CAMERA;
       group.add(mesh);
+      glows.push({ material: mesh.material, opacity });
       ticks.push((dt) => { tex.offset.y = (tex.offset.y + dt * speed * drive.falls) % 1; });
     }
     const splash = glowSprite(P.neonCyan, 1.8, 0.6);
     splash.position.set(x, yBottom + 0.1, z);
     group.add(splash);
+    glows.push({ material: splash.material, opacity: 0.6 });
   };
 
   const basin = (x, y, z, r) => {
     const tub = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.08, 0.34, 40), MAT.hull);
     tub.position.set(x, y + 0.17, z);
     group.add(tub);
-    const rim = flatRing(r, 0.038, neon(P.neonCyan, 2.6));
+    const rimLamp = lamp(P.neonCyan, 2.6);
+    rims.push(rimLamp);
+    const rim = flatRing(r, 0.038, rimLamp);
     rim.position.set(x, y + 0.35, z);
     group.add(rim);
     const water = new THREE.Mesh(new THREE.CircleGeometry(r - 0.06, 40), new THREE.MeshBasicMaterial({
@@ -828,6 +849,8 @@ function dataFalls(drive) {
     water.rotation.x = -Math.PI / 2;
     water.position.set(x, y + 0.32, z);
     group.add(water);
+    water.material.opacity = 1;
+    glows.push({ material: water.material, opacity: 1 });
     ticks.push((dt) => { water.rotation.z -= dt * 0.4 * drive.falls; });
   };
 
@@ -853,7 +876,10 @@ function dataFalls(drive) {
   pool.rotation.x = -Math.PI / 2;
   pool.position.set(tower.x, tower.y + tH + 0.095, tower.z);
   group.add(pool);
+  pool.material.transparent = true;
+  glows.push({ material: pool.material, opacity: 1 });
   const fount = glowSprite(P.neonCyan, 2.0, 0.45);
+  glows.push({ material: fount.material, opacity: 0.45 });
   fount.position.set(tower.x, tower.y + tH + 0.45, tower.z);
   group.add(fount);
   const spout = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.14, 0.5), MAT.trim);
@@ -869,8 +895,13 @@ function dataFalls(drive) {
     group,
     anchor: v3(fx, tower.y + tH + 0.8, fz),
     bounds: [low.clone()], // the lower basin (its front may hide behind the Hook Flow panel)
-    // Speed follows the activity rate (events in the last minute): slow when idle.
-    tick: (t, dt) => { for (const f of ticks) f(dt); },
+    // Speed and brightness follow the activity rate (events in the last minute): dim and slow when idle.
+    tick: (t, dt) => {
+      flow = Math.min(1, Math.max(0, (drive.falls - 0.3) / 2));
+      for (const f of ticks) f(dt);
+      for (const g of glows) g.material.opacity = g.opacity * (0.3 + 0.7 * flow);
+      brighten(rims, flow);
+    },
   };
 }
 
@@ -879,12 +910,15 @@ function dataFalls(drive) {
 function portals(drive) {
   const group = new THREE.Group();
   const spinners = [];
+  const lamps = [];
   const ring = (x, y, z, r, outer, innerColor) => {
     const g = new THREE.Group();
     g.position.set(x, y, z);
-    g.add(flatRing(r, r * 0.045, neon(outer, 2.7)));
-    g.add(flatRing(r * 0.88, r * 0.016, neon(P.neonPurple, 2.2)));
-    g.add(flatRing(r * 0.7, r * 0.022, neon(innerColor, 2.5)));
+    const mats = [lamp(outer, 2.7), lamp(P.neonPurple, 2.2), lamp(innerColor, 2.5)];
+    lamps.push(...mats);
+    g.add(flatRing(r, r * 0.045, mats[0]));
+    g.add(flatRing(r * 0.88, r * 0.016, mats[1]));
+    g.add(flatRing(r * 0.7, r * 0.022, mats[2]));
     const dash = new THREE.Mesh(new THREE.RingGeometry(r * 0.72, r * 0.86, 64), new THREE.MeshBasicMaterial({
       map: TEX.dashes, color: new THREE.Color(innerColor).multiplyScalar(1.8), transparent: true, opacity: 0.8,
       depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
@@ -916,10 +950,12 @@ function portals(drive) {
       // Subagents: the rings spin faster, the core flares when a helper comes or goes.
       const a = drive.act.portal;
       spin += dt * (1 + 3 * a);
+      brighten(lamps, a + drive.portalFlash * 0.6, 0.08);
       spinners.forEach(({ g, dash, core, y }, i) => {
         dash.rotation.z = spin * (i ? -0.5 : 0.3);
         g.position.y = y + Math.sin(t * 0.8 + i * 2) * 0.08;
-        core.material.opacity = 0.45 + 0.3 * a + 0.5 * drive.portalFlash;
+        dash.material.opacity = 0.8 * (0.12 + 0.88 * Math.min(1, a + drive.portalFlash));
+        core.material.opacity = 0.04 + 0.5 * a + 0.5 * drive.portalFlash;
       });
     },
   };
@@ -964,7 +1000,7 @@ function arcade(drive) {
   ball.position.set(-0.2, 1.14, 0.46);
   group.add(ball);
   [P.neonCyan, P.warnYellow, P.neonMagenta].forEach((c, i) => {
-    const b = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.03, 10), neon(c, 2.2));
+    const b = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.03, 10), neon(c, 1.2));
     b.position.set(0.05 + i * 0.11, 1.0, 0.47);
     b.rotation.x = 0.35;
     group.add(b);
@@ -975,7 +1011,8 @@ function arcade(drive) {
     e.translate(sx, 0.925, 0.37);
     edges.push(e);
   }
-  group.add(merged(edges, neon(P.neonMagenta, 2.2)));
+  const edgeLamp = lamp(P.neonMagenta, 2.2);
+  group.add(merged(edges, edgeLamp));
   const glow = glowSprite(P.neonMagenta, 1.8, 0.35);
   glow.position.set(0, 1.4, 0.6);
   group.add(glow);
@@ -988,10 +1025,11 @@ function arcade(drive) {
     tick(t) {
       // After a finished turn the agent plays: the screen lights up and the invaders march.
       const a = drive.act.arcade;
-      screen.material.color.setScalar(0.7 + 1.2 * a);
+      screen.material.color.setScalar(0.3 + 1.5 * a);
       game.offset.x = a > 0.5 ? ((Math.floor(t * 2.5) % 4) - 1.5) / 32 : 0;
-      setGlow(marquee.material, P.neonMagenta, 2.4 * (0.7 + a * (0.45 + 0.25 * Math.sin(t * 6))));
-      glow.material.opacity = 0.2 + 0.25 * a;
+      setGlow(marquee.material, P.neonMagenta, 2.4 * (0.18 + a * (0.95 + 0.25 * Math.sin(t * 6))));
+      brighten([edgeLamp], a, 0.15);
+      glow.material.opacity = 0.05 + 0.32 * a;
     },
   };
 }
@@ -1009,10 +1047,10 @@ function decor() {
   const can = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.28, 0.55, 20), MAT.hull);
   can.position.y = 0.275;
   canister.add(can);
-  const band = flatRing(0.275, 0.022, neon(P.neonCyan, 2.6));
+  const band = flatRing(0.275, 0.022, neon(P.neonCyan, 0.9));
   band.position.y = 0.42;
   canister.add(band);
-  const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.08, 20), neon(P.neonCyanSoft, 1.6));
+  const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.08, 20), neon(P.neonCyanSoft, 0.7));
   lid.position.y = 0.59;
   canister.add(lid);
   group.add(canister);
@@ -1032,8 +1070,8 @@ function decor() {
     l2.translate(0.315, 0.55 - i * 0.12, 0);
     lights.push(l2);
   }
-  box.add(merged(lights, neon(P.fireOrange, 2.4)));
-  const top = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), neon(P.neonCyan, 1.3));
+  box.add(merged(lights, neon(P.fireOrange, 1.3)));
+  const top = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), neon(P.neonCyan, 0.55));
   top.rotation.x = -Math.PI / 2;
   top.position.y = 0.865;
   box.add(top);
@@ -1049,7 +1087,7 @@ function plant(x, y, z, scale, seed) {
   const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.18, 0.34, 18), MAT.hullDark);
   pot.position.y = 0.17;
   g.add(pot);
-  const rim = flatRing(0.24, 0.012, neon(P.neonCyan, 1.8));
+  const rim = flatRing(0.24, 0.012, neon(P.neonCyan, 0.7));
   rim.position.y = 0.34;
   g.add(rim);
   const rand = rng(seed * 101);

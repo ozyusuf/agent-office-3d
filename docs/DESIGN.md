@@ -1,15 +1,24 @@
 # Design
 
-Target image: `docs/design/reference.png` (the right half, x >= 516 px, is the realm screen; the left
-half only shows VS Code next to it). This file describes the design well enough to build it without
-opening the image.
+This file is the source of truth for the look (D49). `docs/design/reference.png` (right half,
+x >= 516 px) still shows which stations exist and where they stand; the look itself was redesigned
+after stage 5 and no longer follows the image.
 
-## 1. Mood
-Night-time cyber RPG workshop floating in a void. Isometric view of dark metal platforms on pipes,
-lit by neon edge strips. Mostly very dark navy/indigo; colour comes only from light sources:
-cyan (dominant), magenta and purple accents, orange fire, yellow for warnings. Soft bloom on every
-emissive edge. Small chibi hacker character in the middle. HUD panels are dark glass with thin
-glowing cyan borders.
+## 1. Mood and principles
+A small workshop floating above a sea of clouds, seen from above like a model: matte dark metal
+platforms on flat-shaded rock islands, warm practical lights (a desk lamp, slit lights under the
+rims), a chibi hacker in the middle. The sky keeps the viewer's local time (D54): dawn glow, a bright
+day, a warm sunset, moon, stars and fireflies at night. Three rules:
+1. **Light is information (D50).** At rest the realm is calm and dim: station neon sits below the
+   bloom threshold and platform rims are thin accent lines. A station lights up in its colour only
+   while it works, so where the light is tells what is going on. Ambient loops (dust, falls, fire)
+   keep moving quietly; the falls' brightness and speed follow the real event rate.
+2. **One voice of colour.** Ink, warm "bone" text and one accent (the setting, cyan by default).
+   Every other colour is a signal: ember = edit, accent = read, green = search, yellow = shell and
+   permission, blue = web, magenta = helpers / arcade, red = errors.
+3. **An instrument, not a costume (D51).** The HUD is precise and quiet: no glass boxes, glowing
+   borders or angled plates; hairlines, tracked small caps, tabular numbers. The scene runs
+   full-bleed; two edge scrims keep the text legible.
 
 ## 2. Palette
 Measured from the reference with a pixel histogram (right half). "Measured" values come straight
@@ -37,12 +46,19 @@ custom properties in `web/theme.css` and mirror them as numbers in the 3D code (
 | `--text` | `#e6f6ff` | derived | primary HUD text |
 | `--text-dim` | `#8aa4c0` | derived | secondary text, timestamps |
 
-HUD glass: fill `rgba(14, 33, 59, 0.72)` (`--surface` at 72 %), border 1 px `--neon-cyan` at ~60 %,
-outer glow `0 0 12px` cyan at ~35 %, radius 4-6 px. Accent colour (stage 5) replaces `--neon-cyan`.
+HUD tokens added in the redesign (derived, `theme.css`): `--ink #060910` (scrims, panel fill),
+`--text #ece8df` (warm bone), `--text-soft #b8bcc6`, `--text-dim #858d9c`, `--text-faint #4f5767`,
+`--hair` (bone at 13 %, hairlines), `--accent` = `--neon-cyan`, `--lamp #ffc48a` (desk lamp), and
+`--skill-*` station colours (read = accent soft, search = green, edit = fire orange, shell = yellow,
+web = `#6aa8ff`, permission = yellow, helper = magenta).
 
-Typography: techy sans for titles/labels (must include Turkish glyphs İ Ş Ğ Ç Ö Ü ı), monospace for
-the log. Candidates (OFL, self-hosted, ask before downloading): Exo 2 or Rajdhani + JetBrains Mono.
-Fallback stack: `Bahnschrift, "Segoe UI", sans-serif` and `Consolas, monospace`.
+Accent colour (setting `accentColor`, D47) replaces `--neon-cyan`; `--neon-cyan-soft` becomes the
+accent with 15 % white. In 3D every material built in the base cyan follows it.
+
+Typography: system fonts only (nothing downloaded). `Bahnschrift` (a DIN face shipped with Windows,
+has the Turkish glyphs) for everything in the HUD, labels in tracked uppercase (0.12-0.16 em),
+numbers tabular; `Cascadia Mono` / `Consolas` for the log. Fallbacks: DIN Alternate, Segoe UI,
+system-ui; ui-monospace.
 
 ## 3. Screen layout (HTML/CSS overlay on top of the full-bleed 3D canvas)
 Target window: narrow portrait, about half a 1920x1080 screen (e.g. 600-960 px wide, 1000+ tall).
@@ -50,66 +66,75 @@ Must also work down to 420 px wide. Nothing scrolls; the log scrolls inside itse
 
 ```
 +--------------------------------------------------+
-| [stats panel]   ╔═ REALM TITLE ═╗   (o)(o)(⚙)    |  top row
-|  ctx  ▓▓▓░░     ╚══ subtitle ═══╝                |
-|  eff  ▓▓░░░                                      |
-|  time ▓░░░░                                      |
+| ⬡ AGENT-OFFICE-3D       ● WORKING · 12 TOOLS • ⚙ |  header (wordmark | state, connection, gear)
+|   demo-project                                   |
+| ------------------------------------------------ |  hairline
+| CONTEXT   34/150 | EFFORT     high | TIME    42m  |  instruments
+| ▮▮▮▮▮▮▯▯▯▯▯▯▯▯▯ | ▮▮▮▯▯           | ━━━━━●─────  |
 |                                                  |
+|          ■ VISION & TASK BOARD                   |  callout labels with leader lines
+|               |                                  |
+|   (LV 3) Claude · Editing (auth.js)              |  nameplate over the character
 |            (3D scene, isometric)                 |
-|      [Station label]          [Station label]    |
-|               (24) Name · Editing (auth.js)      |  character label
-|                    ▓▓▓▓▓▓░░░░                    |
 |                                                  |
-|               ┌──── Hook Flow ────┐              |
-| [06:35] auth.js analysed...                      |  log panel
-| [06:35] ...                                      |
-| ● Read  ● Grep  🔥 Edit  ⚡ Bash  🌐 Web  🔔 Perm |  skill bar
+| HOOK FLOW ---------------------------------------|
+| 09:35 | auth.js analysed...                      |  log, newest at the bottom
+| ------------------------------------------------ |  skill rail (the line lights above the active one)
+| ▫ READ  ⌕ GREP  ♨ EDIT  >_ BASH  ◎ WEB  ◌ PERMISSION |
 +--------------------------------------------------+
 ```
 
-- **Title banner** (top centre): angled-corner frame, cyan border with magenta corner accents.
-  Line 1 = realm title (uppercase, letter-spaced, white with cyan glow). Line 2 = subtitle (small,
-  cyan, letter-spaced). Default title "agent-office-3d" (same in every language); subtitle defaults
-  to the current project folder name (from the event `cwd`), hidden until one is known or when it
-  equals the title. Both overridable in settings (`realmTitle`, `realmSubtitle`). Uppercase follows
-  `<html lang>` (tr: i -> İ). The names in the reference image are only examples (D23).
-  Below ~560 px width the banner takes its own row and the stats panel + icons sit under it.
-- **Stats panel** (top left, small glass panel): a status line (coloured dot + session state), a
-  header "Session" with the session's finished tool count, then three meters. Each meter = label and
-  real value on one line, thin bar below (the column is only ~175 px wide at 600 px):
-  1. Context fill - main-agent tool uses since the last compaction (count / `contextBarMax`, default
-     150; subagent calls do not count). "≥" when the server joined mid-session. Cyan -> green.
-  2. Effort - `effort.level` from the latest event: low 1/5, medium 2/5, high 3/5, xhigh 4/5, max 5/5;
-     "–" if no event carried it yet. Magenta.
-  3. Session time - since SessionStart (or first event seen, shown with "≥"); bar fills over
-     `sessionBarMinutes` (default 120). Purple.
-  Before the first event the panel shows only "waiting for events" (no bars).
-- **Status icons** (top right, row of small round glass buttons): connection (green connected /
-  red dropped), session state (cyan working, grey idle, yellow waiting permission, red error,
-  dim ended), settings (gear). Stage 2: the gear opens a small menu (language TR/EN for this tab,
-  link to the debug view); stage 5 replaces it with the full panel.
-- **Character label** (screen-projected above the character's head): round level badge
-  ("Lvl" + number), text "Name · activity (file)", e.g. "Claude · Editing (auth.js)", and a thin
-  XP bar (magenta -> pink) showing progress to the next level, with "xp / needed XP" under it.
-  The orange ring around the badge is decoration. The activity value is cyan, yellow while waiting
-  for permission, red on error.
-- **Station labels**: small glass pills with thin cyan border floating above each station
-  (screen-projected each frame, `web/labels.js`). Active station's label brightens. Always shown:
-  Code Smelter, Vision & Task Board, Terminal; shown only while active: Orbit Sphere, Server
-  Racks, Portal Ring, Arcade; never: desk (the character label is there) and data falls
-  (`web/stations.js`). Labels shrink with the scene in small windows (down to 70 %) and step aside
-  the shortest way when they would overlap (character label first, then active stations).
-  They sit below the HUD panels, so the glass covers them. Without WebGL: fixed slots, stage 2 style.
-- **Hook flow log** (bottom): glass panel with a centred tab title "Hook Flow" on its top edge.
-  Monospace lines `[HH:MM] <readable text>`; newest at the bottom; auto-scroll; 6 visible lines (4 in windows under 820 px tall);
-  keep last 200. Lines are human sentences from i18n, e.g. "auth.js okunuyor...": values white,
-  the sentence tinted by event type. PostToolUse adds no line. "↳" marks calls inside a subagent;
-  with 2+ sessions in the log every line gets a 4-character session tag.
-- **Skill bar** (very bottom, full width, dark strip): Read, Grep, Edit, Bash, Web, Permission.
-  Each = icon/dot + label. Idle = dim. Active = glows in its colour and shows "(active)".
-  Permission waiting = yellow blink (~1 Hz). Colours: Read purple-blue dot, Grep green dot (as in
-  the reference), Edit fire-orange flame, Bash yellow bolt, Web blue globe, Permission yellow bell.
-  Turkish labels: Oku, Ara, Düzenle, Komut, Web, İzin ("İzin Bekliyor" while waiting).
+- **Scrims**: an ink gradient at the top (~170 px) and the bottom (~270 px) behind the HUD text;
+  the scene fades into them. No other backgrounds behind the HUD.
+- **Header** (top row): left a small isometric cube mark in the accent, the realm title (tracked
+  uppercase, 14 px bold) and under it the subtitle (dim). Default title "agent-office-3d" (same in every
+  language, uppercased as English); subtitle defaults to the current project folder name (from the
+  event `cwd`), hidden until one is known or when it equals the title. Both overridable in settings
+  (`realmTitle`, `realmSubtitle`); a custom title is uppercased in the page language (tr: i -> İ).
+  Right: the session state as text with a dot (working = accent dot with a slow breathing halo,
+  idle dim, waiting yellow blinking, error red, ended / none faint) and "· N tools" (finished tool
+  calls of the session; hidden under 480 px), the connection dot (green, yellow connecting, red
+  blinking when dropped), the gear (opens the settings panel).
+- **Instruments** (under a hairline): three cells side by side, split by hairlines. Each = small caps
+  label, value on the right, meter below. Before the first event only "waiting for events".
+  1. Context - the real tokens in the main agent's context, read from the end of the session
+     transcript (D55), e.g. "573k / 1M"; the window is the setting `contextWindow` (auto = 200k, or
+     1M once more is in use). 30 cells, accent. Until the transcript can be read: main-agent tool
+     calls since the last compaction / `contextBarMax` ("≥" when the server joined mid-session).
+  2. Effort - `effort.level` from the latest event: low 1/5 ... max 5/5; 5 cells (bone); "–" if no
+     event carried it yet.
+  3. Session time - since SessionStart (or first event seen, "≥"); a 2 px line with a bright head,
+     full at `sessionBarMinutes` (default 120).
+- **Nameplate** (follows the character's head, hidden while there is no character): dark capsule; a round level badge whose ring is the
+  XP progress to the next level (accent), "Name · activity (file)" and "xp / needed XP" under it. The
+  activity value is accent, yellow while waiting for permission, red on error.
+- **Station callouts** (`web/labels.js`, D52): small uppercase labels on a dark chip, 16 px above the
+  station, joined to it by a hairline leader with a dot. Idle: dim text and a grey square. Active:
+  bright text, the square and the leader in the station's colour. Always shown: Code Smelter,
+  Vision & Task Board, Terminal; only while active: Orbit Sphere, Server Racks, Portal Ring, Arcade;
+  never: desk (the nameplate is there) and data falls (`web/stations.js`). Labels shrink with the
+  scene (down to 70 %), step aside the shortest way when they overlap (nameplate first, then active
+  stations) and stay inside the free middle area; the leader follows. Without WebGL: fixed slots.
+- **Hook Flow log** (bottom): small caps heading with a hairline; monospace lines `HH:MM ▍ text`,
+  newest at the bottom (few lines sit at the bottom too), older lines fade out at the top; 6 lines
+  (4 in windows under 820 px tall); keep last 200. Values are brighter than the sentence; the
+  marker bar has the colour of what happened (tool lines: their station's colour; prompt accent,
+  session violet, permission yellow, failures red, helpers magenta, compaction orange). PostToolUse
+  adds no line. "↳" marks calls inside a subagent; with 2+ sessions every line gets a 4-character
+  session tag.
+- **Skill rail** (very bottom, under a hairline): Read, Grep, Edit, Bash, Web, Permission as line
+  icons + small caps names. Idle = faint. Active = bright, icon in its colour, and the rail segment
+  above it lights up in that colour. Permission waiting = yellow, blinking (~1 Hz). Turkish labels:
+  Oku, Ara, Düzenle, Komut, Web, İzin ("İzin Bekliyor" while waiting).
+- **Settings panel** (gear, `web/settings.js`, D46-D48): an ink panel with a hairline border under
+  the gear; groups: names (agent name, title, subtitle, language), accent colour (6 presets + any
+  colour), sky (clock / dawn / day / dusk / night), 3D graphics (bloom, pixel ratio, measured fps),
+  bars (context window auto / 200k / 1M, time bar scale).
+- **Level up** (D56): when the XP crosses a level, a centred banner "Level up · LV n" (gold small caps
+  over a big bone number, thin gold lines growing out to the sides) shows for ~3.4 s, the level badge
+  pulses gold and the scene throws sparks (see section 5). Every
+  change shows at once, is saved to config.json and applies in every open tab. Scrolls inside when
+  the window is short.
 - **i18n**: one file `web/i18n.js` with `tr` and `en`; default from settings. Station names:
 
 | Key | en | tr |
@@ -124,43 +149,60 @@ Must also work down to 420 px wide. Nothing scrolls; the log scrolls inside itse
 | portal | Portal Ring | Geçit Halkası |
 | arcade | Arcade | Oyun Makinesi |
 
-## 4. 3D scene (stage 3)
-Orthographic isometric camera (~35° down, 45° yaw), framed for portrait. Fog towards `--bg-void`.
-Floating dark metal platforms (`--metal` / `--surface-violet`, low roughness) at slightly different
-heights, joined by pipes; neon edge strips on platform rims (cyan, some magenta/purple).
+## 4. 3D scene
+Orthographic isometric camera (~35° down, 45° yaw), framed for portrait.
+Sky (`sky.js`, `daylight.js`, D54): a gradient plane riding with the camera (top -> horizon glow ->
+deep below), a field of ~200 cumulus puffs (one instanced mesh, lit top / shaded base, drifting right)
+on two layers below the islands whose far rows melt into the horizon band, stars and the moon or sun
+on an arc from left to right, fireflies after dark. Keyframes (local hour): 0 night, 4.5 late night,
+6 dawn, 7.5 morning, 12 noon, 16 afternoon, 18 sunset, 19.5 dusk, 21 night. The hemisphere, key and
+fill lights, the key light's direction, the exposure, the reflection map and the HUD scrims follow.
+Fog only reaches what lies far behind or deep below (pipes sinking into the clouds).
+Floating dark metal platforms at slightly different heights on rock islands (upside-down cones of
+flat-shaded facets, lighter strata on top, a few accent crystals), joined by pipes; every platform
+rim is a thin accent line below the bloom threshold (main 0.8, others 0.55); warm slit lights under
+the rims. Lights: hemisphere + sun/moon key, a warm desk lamp (`#ffc48a`) in front of the
+character, and one point light per station that pools only while it works (0.45x at rest, up to
+1.45x). Bloom: strength 0.75, radius 0.5, threshold 0.85 - only working stations (and the sun) bloom.
 Placement as seen in the reference (screen positions inside the realm view):
 
 | Object | Where | Look | Driven by |
 |---|---|---|---|
-| Command desk + character | centre | round dais with cyan rings; ring console open towards the camera (a closed front hid the character), holo keyboard in the opening; character stands inside | everything |
+| Command desk + character | centre | round dais with accent rings; ring console open towards the camera (a closed front hid the character), holo keyboard in the opening; character stands inside. Console rests at 0.42, dais rings at 0.3; both light up while the agent types and flash on a prompt | everything |
 | Code Smelter | left of centre, slightly lower | boxy furnace, orange fire core, sparks | Edit, Write, NotebookEdit |
-| Vision & Task Board | right/behind character | large curved holo screen (blue, cyan code lines) | Read, Grep, Glob, todo/task tools |
-| Terminal (key `centrifuge`) | bottom right | 3 nested gimbal rings (magenta, cyan, yellow) on a base | every Bash, PowerShell call |
+| Vision & Task Board | right/behind character | large curved holo screen (blue, coloured code bars); screen 0.48 at rest, frame and projector beam light up | Read, Grep, Glob, todo/task tools |
+| Terminal (key `centrifuge`) | bottom right | 3 nested gimbal rings (orange, accent, yellow) on a base with a yellow rim; nearly dark at rest (0.09), spin up and blaze while a command runs | every Bash, PowerShell call |
 | Orbit Sphere | top right | blue glowing planet with 2 tilted rings, on a pipe pedestal | WebSearch, WebFetch |
 | Server racks | top left, behind | 3 tall cabinets with LED rows | context fill |
-| Data falls | bottom left + right edge | cyan particle/texture waterfalls from pipes into basins | activity rate |
-| Portal ring | top centre, floating | big flat magenta+cyan neon ring (plus a small one top left) | subagents |
-| Arcade machine | far left | pink/purple arcade cabinet with glowing screen | Stop (idle) |
+| Data falls | bottom left + right edge | accent texture waterfalls from pipes into basins; speed and brightness (0.3x-1x) follow the event rate | activity rate |
+| Portal ring | top centre, floating | big flat magenta + accent ring (plus a small one top left); almost dark (0.08) until a helper runs, flares when one comes or goes | subagents |
+| Arcade machine | far left | dark purple cabinet; marquee, edges and screen light up while the agent plays | Stop (idle) |
 | Decor | around | potted plants, small canisters, cable bundles | none |
 
 Character: chibi proportions (big head), dark hoodie with cyan trims, headphones, cyan visor
 glasses, messy dark hair. Build from primitives first; if it looks poor, propose a CC0 model and ask.
 
 Framing: the main platform takes at most 78 % of the free middle area's width, and the scene from the
-big portal down to the lower data-fall basin at most its height (+ a little room behind the glass
-panels). Side platforms may run off the window edges, as in the reference.
+big portal down to the lower data-fall basin at most its height (+ a little room under the edge
+scrims). Side platforms may run off the window edges, as in the reference.
+
+Resting and working levels (`lamp()` / `brighten()` in kit.js): a station's neon sits at about 0.1-0.4
+of its full intensity at rest and goes to ~1.1x while it works. After a finished turn the whole scene
+is 16 % darker (the arcade stands out); standby and StopFailure dim it further (see section 5).
 
 Performance: `renderer.setPixelRatio(Math.min(devicePixelRatio, cap))` (default cap 1.5), stop the
 loop on `document.hidden`, bloom toggle (UnrealBloomPass, half-res), shared materials, instanced
 LEDs/particles, no shadows, frames closer than 1000/75 ms are skipped (60 Hz draws every frame,
 120/144 Hz draw 60/72). MSAA on the bloom target only below pixel ratio 1.5. Target 60 fps on
 integrated GPUs with the default settings (measured on Intel UHD, see PROGRESS session 3).
-Settings: `bloom`, `pixelRatioCap` in config.json; the gear menu overrides them for one tab.
+Settings: `bloom`, `pixelRatioCap` in config.json, changed from the settings panel (URL `?bloom` / `?pr`
+override them for one tab).
 
 Decoration vs data: the board's "code" is coloured bars only (no characters or numbers); the only
 real values in the 3D scene are the board's ticker (file name, search pattern, task chips), the
 lit rack LEDs (context fill) and the helper bots (one per running subagent). Ambient loops keep
-running at a low idle level; events speed them up.
+running at a low idle level; events speed them up. The sky, clouds and fireflies follow only the
+clock (or the `sky` setting) and stand for no session data.
 
 Stage 4 wiring (`web/scene/`): `director.js` turns the server snapshot (+ live events) into goals,
 `realm.js` eases a shared `drive` object towards them every frame (stations rise in ~0.2 s, settle
@@ -179,11 +221,11 @@ Every reaction is caused by a real event. "Pair" = matched by `tool_use_id`.
 |---|---|---|---|
 | SessionStart | any `source` | scene powers up from standby (dim), character appears at the desk in a light column, dais flashes | session timer starts; state working/idle; log "Session started (source)" |
 | UserPromptSubmit | - | dais flashes; character goes to the desk and types; clears waiting/error states | log "New request"; state working. Prompt text is NOT shown in the HUD (debug view only) |
-| PreToolUse | Read | character walks to the Board and points at it; board brightens; file name runs along a ticker strip at the board's bottom | Read glows; label "Reading (file)" |
-| PreToolUse | Grep, Glob | same, the ticker shows the pattern (magnifier icon) | Grep glows; label "Searching (pattern)" |
-| PreToolUse | Edit, Write, NotebookEdit | character walks to the Smelter and hammers; flames grow, sparks fly, furnace glows | Edit glows; label "Editing (file)" |
-| PreToolUse | Bash, PowerShell | character types at the desk; Terminal rings spin up and brighten | Bash glows; label "Running command" |
-| PreToolUse | WebSearch, WebFetch | character types at the desk; Orbit Sphere spins faster, rings brighten | Web glows; label "Searching the web (host)" |
+| PreToolUse | Read | character walks to the Board and points at it; board brightens; file name runs along a ticker strip at the board's bottom | Read lights up on the skill rail; label "Reading (file)" |
+| PreToolUse | Grep, Glob | same, the ticker shows the pattern (magnifier icon) | Grep lights up on the skill rail; label "Searching (pattern)" |
+| PreToolUse | Edit, Write, NotebookEdit | character walks to the Smelter and hammers; flames grow, sparks fly, furnace glows | Edit lights up on the skill rail; label "Editing (file)" |
+| PreToolUse | Bash, PowerShell | character types at the desk; Terminal rings spin up and brighten | Bash lights up on the skill rail; label "Running command" |
+| PreToolUse | WebSearch, WebFetch | character types at the desk; Orbit Sphere spins faster, rings brighten | Web lights up on the skill rail; label "Searching the web (host)" |
 | PreToolUse | TodoWrite, Task* tools | character to the Board; TodoWrite: ticker shows one chip per task (done green, in progress yellow, open outline; counts only) | label "Planning tasks" |
 | PreToolUse | anything else (MCP, Skill, ...) | character types at the desk; desk holograms pulse | log only |
 | PostToolUse | pair | station eases back to idle (~1 s); character stays 2.5 s, then returns to the desk | context +1, total +1 (XP); skill dims |
@@ -193,11 +235,13 @@ Every reaction is caused by a real event. "Pair" = matched by `tool_use_id`.
 | SubagentStop | same `agent_id` | helper flies back over the portal and sinks into it; its unfinished calls end | log "Helper returned" |
 | PreCompact | `trigger` | rack strips flash, LEDs drain top to bottom (1.5 s) | log "Compacting context (auto/manual)" |
 | PostCompact | - | racks stay empty | context bar -> 0 |
-| Stop | - | character walks to the arcade and plays; arcade screen lights up | state idle; log "Turn finished" |
-| StopFailure | `error` (e.g. rate_limit) | lights go down, red alert pulse on every platform rim; character slumps at the desk | red vignette; state error (red); label shows error type; cleared by next UserPromptSubmit/SessionStart |
+| Stop | - | character walks to the arcade and plays; arcade screen lights up; the scene lowers its lights a little; a shooting star crosses the sky if the stars are out | state idle; log "Turn finished" |
+| (derived) | XP crosses a level | gold sparks burst out of the character, a gold ring runs over the dais | "Level up · LV n" banner, badge pulses |
+| (derived) | transcript usage (main thread) | rack LEDs lit = tokens / window x 144 | context meter in tokens |
+| StopFailure | `error` (e.g. rate_limit) | lights go down, red alert pulse on every platform rim; a storm over the realm: darker clouds and sky, rain, soft lightning now and then; character slumps at the desk | red vignette; state error (red); label shows error type; cleared by next UserPromptSubmit/SessionStart |
 | SessionEnd | `reason` | scene dims to standby, character fades out in a light column | timer stops; state ended; log "Session ended (reason)" |
 | (derived) | events in the last 60 s (all sessions) | data falls: 0.3x when idle up to ~3.8x at 40+ events per minute | - |
-| (derived) | tool uses since compaction | rack LEDs lit = count / `contextBarMax` (bottom row first, all 144 at the max) | context bar |
+| (derived) | tool uses since compaction (fallback, no transcript yet) | rack LEDs lit = count / `contextBarMax` (bottom row first, all 144 at the max) | context bar |
 
 Safety nets against stuck states (server): a main-agent PreToolUse or Stop/StopFailure ends a
 compaction that never got PostCompact; SubagentStop ends that helper's unfinished calls. A permission

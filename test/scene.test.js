@@ -144,10 +144,10 @@ test('board shows the latest read / search / task call', () => {
 test('derived values: rate, falls, racks, power, alert', () => {
   assert.equal(eventRate([NOW - 70_000, NOW - 30_000, NOW - 1], NOW), 2);
   assert.ok(fallsSpeed(0) < fallsSpeed(10) && fallsSpeed(40) === fallsSpeed(400));
-  assert.equal(rackTarget(focusOf({ context: 75 }), 150, 144), 72);
-  assert.equal(rackTarget(focusOf({ context: 900 }), 150, 144), 144);
-  assert.equal(rackTarget(focusOf({ context: 75, compacting: { trigger: 'auto' } }), 150, 144), 0);
-  assert.equal(rackTarget(null, 150, 144), 0);
+  assert.equal(rackTarget(focusOf({ context: 75 }), 0.5, 144), 72);
+  assert.equal(rackTarget(focusOf({ context: 900 }), 6, 144), 144);
+  assert.equal(rackTarget(focusOf({ context: 75, compacting: { trigger: 'auto' } }), 0.5, 144), 0);
+  assert.equal(rackTarget(null, 0.5, 144), 0);
   assert.equal(powerOf(null), 0);
   assert.equal(powerOf(focusOf({ status: 'ended' })), 0);
   assert.equal(powerOf(focusOf({ status: 'idle' })), 1);

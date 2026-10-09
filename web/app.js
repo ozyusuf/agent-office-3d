@@ -7,6 +7,9 @@ import { LANGS, makeTranslator } from './i18n.js';
 import { logEntry, activityParts, formatDuration } from './narrate.js';
 import { STATIONS, activeStations } from './stations.js';
 import { createLabelLayer } from './labels.js';
+import { createSettings } from './settings.js';
+import { accentPair, DEFAULT_ACCENT } from './palette.js';
+import { contextFill, windowFor, formatTokens } from './context.js';
 
 const LOG_LINES = 200;
 const EVENTS_KEPT = 400; // PostToolUse events add no line, so keep more events than lines
@@ -17,14 +20,14 @@ const $ = (id) => document.getElementById(id);
 
 const view = {
   conn: 'connecting',
-  config: null, // from the server's hello
   hud: null, // latest server snapshot: { stats, liveSessions, focus }
   events: [], // recent events for the log
-  lang: langFromUrl(), // explicit choice in this page; otherwise config.language
+  lang: langFromUrl(), // ?lang= for this tab only; otherwise config.language
   multiSession: false,
-  // 3D quality: explicit choice in this page (menu, or ?bloom=0|1&pr=1|1.5|2); otherwise config.json
+  // 3D quality for this tab only (?bloom=0|1&pr=1|1.5|2); otherwise config.json
   bloom: fromUrl('bloom', (v) => (v === '1' ? true : v === '0' ? false : null)),
   pixelRatioCap: fromUrl('pr', (v) => (Number(v) >= 0.5 && Number(v) <= 3 ? Number(v) : null)),
+  hour: fromUrl('hour', (v) => (v !== '' && Number(v) >= 0 && Number(v) < 24 ? Number(v) : null)), // fixed sky time
 };
 let t = makeTranslator(view.lang ?? 'en');
 let realm = null; // the 3D scene once loaded; stays null without WebGL
@@ -69,12 +72,14 @@ function renderTint() {
 }
 
 function applyLanguage() {
-  t = makeTranslator(view.lang ?? view.config?.language ?? 'en');
+  t = makeTranslator(view.lang ?? cfg().language ?? 'en');
   document.documentElement.lang = t.lang; // also makes CSS uppercase Turkish i -> İ correctly
   for (const node of document.querySelectorAll('[data-i18n]')) node.textContent = t(node.dataset.i18n);
-  for (const button of document.querySelectorAll('[data-lang]')) {
-    button.setAttribute('aria-pressed', String(button.dataset.lang === t.lang));
+  for (const node of document.querySelectorAll('[data-i18n-title]')) {
+    node.title = t(node.dataset.i18nTitle);
+    node.setAttribute('aria-label', node.title);
   }
+  for (const node of document.querySelectorAll('[data-i18n-placeholder]')) node.placeholder = t(node.dataset.i18nPlaceholder);
   $('icon-settings').title = t('settings');
   $('icon-settings').setAttribute('aria-label', t('settings'));
   $('log-empty').textContent = view.hud ? t('waitingEvents') : t('connecting');
@@ -82,11 +87,32 @@ function applyLanguage() {
   renderQuality();
 }
 
+// Accent colour: replaces --neon-cyan / --neon-cyan-soft (every HUD colour derived from them
+// follows) and the neon of the 3D scene. The default leaves theme.css as measured.
+let accentShown = DEFAULT_ACCENT;
+function applyAccent() {
+  const hex = cfg().accentColor ?? DEFAULT_ACCENT;
+  if (hex === accentShown) return;
+  accentShown = hex;
+  const { css } = accentPair(hex);
+  const root = document.documentElement.style;
+  if (hex === DEFAULT_ACCENT) {
+    root.removeProperty('--neon-cyan');
+    root.removeProperty('--neon-cyan-soft');
+  } else {
+    root.setProperty('--neon-cyan', css.main);
+    root.setProperty('--neon-cyan-soft', css.soft);
+  }
+  realm?.setAccent(hex);
+}
+
 function renderTop() {
-  const title = view.config?.realmTitle || APP_NAME;
+  const title = cfg().realmTitle || APP_NAME;
   $('realm-title').textContent = title;
+  // The app's own name is English: uppercase it as English (no Turkish İ); a custom title follows the page.
+  $('realm-title').lang = cfg().realmTitle ? '' : 'en';
   document.title = title;
-  const subtitle = view.config?.realmSubtitle || view.hud?.focus?.project || '';
+  const subtitle = cfg().realmSubtitle || view.hud?.focus?.project || '';
   $('realm-subtitle').textContent = subtitle;
   // Hidden when unknown, or when it would repeat the title (e.g. working in this repo itself).
   $('realm-subtitle').hidden = !subtitle || subtitle.toLowerCase() === title.toLowerCase();
@@ -112,9 +138,19 @@ function renderStats() {
   $('tools-done').textContent = focus ? t('toolsDone', { n: focus.toolsDone }) : '';
   if (!focus) return;
 
-  const max = view.config.contextBarMax;
-  setMeter('context', focus.context / max, `${focus.contextExact ? '' : '≥'}${focus.context} / ${max}`,
-    focus.contextExact ? t('tip.context', { max }) : t('tip.contextLow'));
+  const fill = contextFill(focus, cfg());
+  if (Number.isFinite(focus.tokens)) {
+    // Real tokens from the session transcript (D55).
+    const auto = !Number.isFinite(cfg().contextWindow);
+    const win = windowFor(focus.tokens, cfg().contextWindow);
+    setMeter('context', fill, `${formatTokens(focus.tokens)} / ${formatTokens(win)}`,
+      t(auto ? 'tip.tokensAuto' : 'tip.tokens', { tokens: focus.tokens.toLocaleString(t.lang), window: formatTokens(win), model: focus.tokensModel ?? '?' }));
+  } else {
+    // Fallback until the transcript can be read: tool calls since the last compaction.
+    const max = cfg().contextBarMax;
+    setMeter('context', fill, `${focus.contextExact ? '' : '≥'}${focus.context} / ${max}`,
+      focus.contextExact ? t('tip.context', { max }) : t('tip.contextLow'));
+  }
 
   const step = EFFORT_STEPS[focus.effort];
   setMeter('effort', step ? step / 5 : 0, focus.effort ? t.word('effort', focus.effort) : '–',
@@ -127,7 +163,7 @@ function renderTime() {
   const focus = view.hud?.focus;
   if (!focus) return;
   const elapsed = (focus.endedAt ?? Date.now()) - focus.startedAt;
-  const minutes = view.config.sessionBarMinutes;
+  const minutes = cfg().sessionBarMinutes;
   setMeter('time', elapsed / (minutes * 60000), `${focus.startExact ? '' : '≥'}${formatDuration(elapsed, t)}`,
     focus.startExact ? t('tip.time', { max: minutes }) : t('tip.timeLow'));
 }
@@ -142,16 +178,18 @@ function setMeter(name, fraction, value, tip) {
 function renderCharacter() {
   const stats = view.hud?.stats;
   $('lvl').textContent = stats ? String(stats.level) : '–';
-  $('xp-fill').style.width = stats ? `${stats.progress * 100}%` : '0';
+  $('lvl-badge').style.setProperty('--xp', stats ? String(stats.progress) : '0'); // XP ring around the level
   $('xp-text').textContent = stats
     ? t('xp', { xp: stats.xp - stats.levelXp, next: stats.nextLevelXp - stats.levelXp })
     : '';
   $('char-label').title = stats ? t('tip.xp', { level: stats.level, total: stats.xp }) : '';
 
   $('char-label').dataset.status = view.hud?.focus?.status ?? 'none';
+  const away = !view.hud?.focus || view.hud.focus.status === 'ended';
+  if ($('char-label').hidden !== Boolean(realm && away)) $('char-label').hidden = Boolean(realm && away);
   const line = $('char-line');
   line.replaceChildren();
-  if (view.config?.agentName) line.append(el('span', 'name', view.config.agentName), el('span', 'sep', '·'));
+  if (cfg().agentName) line.append(el('span', 'name', cfg().agentName), el('span', 'sep', '·'));
   if (view.hud) appendParts(line, activityParts(view.hud.focus, t));
   else line.append(t('connecting'));
   line.title = line.textContent;
@@ -238,10 +276,11 @@ function logItem(e) {
   if (!entry) return null;
   const item = el('li');
   item.dataset.tone = entry.tone;
-  item.append(el('span', 'ts', `[${clock(e.hookTs)}]`), ' ');
-  if (view.multiSession) item.append(el('span', 'sid', (e.sessionId ?? '?').slice(0, 4)), ' ');
+  if (entry.tone === 'tool' && e.kind) item.dataset.kind = e.kind; // tool lines take their station's colour
+  item.append(el('span', 'ts', clock(e.hookTs)));
+  if (view.multiSession) item.append(el('span', 'sid', (e.sessionId ?? '?').slice(0, 4)));
   // ↳ marks calls made inside a subagent (SubagentStart/Stop carry agent_id too but are main-thread events).
-  if (e.agentId && !e.event.startsWith('Subagent')) item.append(el('span', 'sub', '↳ '));
+  if (e.agentId && !e.event.startsWith('Subagent')) item.append(el('span', 'sub', '↳'));
   const message = el('span', 'msg');
   appendParts(message, entry.parts);
   item.append(message);
@@ -271,55 +310,73 @@ function clock(ms) {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-// ---- Settings menu (full settings panel arrives in stage 5) ----
+// ---- Settings panel (web/settings.js) ----
 
-function setupSettings() {
-  const button = $('icon-settings');
-  const menu = $('settings');
-  const toggle = (open) => {
-    menu.hidden = !open;
-    button.setAttribute('aria-expanded', String(open));
-  };
-  button.addEventListener('click', (ev) => {
-    ev.stopPropagation();
-    toggle(menu.hidden);
-  });
-  menu.addEventListener('click', (ev) => ev.stopPropagation());
-  document.addEventListener('click', () => toggle(false));
-  document.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape') toggle(false);
-  });
-  for (const langButton of menu.querySelectorAll('[data-lang]')) {
-    langButton.addEventListener('click', () => {
-      view.lang = langButton.dataset.lang; // this page only; the saved default is config.json
-      renderAll();
-    });
-  }
-  // Bloom and pixel ratio: this page only, like the language.
-  for (const button of menu.querySelectorAll('[data-bloom]')) {
-    button.addEventListener('click', () => {
-      view.bloom = button.dataset.bloom === '1';
-      applyQuality();
-    });
-  }
-  for (const button of menu.querySelectorAll('[data-pr]')) {
-    button.addEventListener('click', () => {
-      view.pixelRatioCap = Number(button.dataset.pr);
-      applyQuality();
-    });
-  }
-  // The measured frame rate is refreshed while the menu is open.
-  setInterval(() => {
-    if (!menu.hidden) renderQuality();
-  }, 1000);
+const settings = createSettings({
+  panel: $('settings'),
+  button: $('icon-settings'),
+  status: $('save-status'),
+  translate: () => t,
+  onChange: applyConfig,
+});
+
+/** The settings in use: the server's config.json values plus this tab's unsaved edits. */
+function cfg() {
+  return settings.effective();
 }
+
+/** The effective config changed (an edit in this tab, or a save from any tab): apply it live. */
+function applyConfig(keys, byUser) {
+  if (byUser) {
+    // A choice made in the panel replaces this tab's URL override (?lang, ?bloom, ?pr).
+    if (keys.includes('language')) view.lang = null;
+    if (keys.includes('bloom')) view.bloom = null;
+    if (keys.includes('pixelRatioCap')) view.pixelRatioCap = null;
+  }
+  if (view.hud) realm?.setState(view.hud, cfg()); // the context window drives the rack LEDs
+  if (keys.includes('sky')) realm?.refreshSky();
+  applyAccent();
+  const lang = t.lang;
+  applyLanguage();
+  if (t.lang !== lang) renderLog();
+  renderLive();
+  applyQuality();
+}
+
+function renderSettings() {
+  settings.render({ ...cfg(), language: t.lang, ...quality() });
+}
+
+// The measured frame rate is refreshed while the panel is open.
+setInterval(() => {
+  if (settings.isOpen()) renderQuality();
+}, 1000);
 
 // ---- 3D scene ----
 
+/** The hour the sky shows: a fixed one (URL ?hour=, or the sky setting), or null = the local clock. */
+const SKY_HOURS = { dawn: 6.4, day: 12, dusk: 18.3, night: 0.5 };
+function skyHour() {
+  return view.hour ?? SKY_HOURS[cfg().sky] ?? null;
+}
+
+/** The HUD's edge scrims take a deep shade of the current sky, so they melt into it. */
+function applySky(sky) {
+  const triplet = (hex) => `${(hex >> 16) & 255} ${(hex >> 8) & 255} ${hex & 255}`;
+  const deep = (hex, k) => {
+    let out = 0;
+    for (const shift of [16, 8, 0]) out |= Math.round(((hex >> shift) & 255) * k + 4 * (1 - k)) << shift;
+    return out;
+  };
+  const root = document.documentElement.style;
+  root.setProperty('--scrim-top', triplet(deep(sky.top, 0.42)));
+  root.setProperty('--scrim-bottom', triplet(deep(sky.low, 0.38)));
+}
+
 function quality() {
   return {
-    bloom: view.bloom ?? view.config?.bloom ?? true,
-    pixelRatioCap: view.pixelRatioCap ?? view.config?.pixelRatioCap ?? 1.5,
+    bloom: view.bloom ?? cfg().bloom ?? true,
+    pixelRatioCap: view.pixelRatioCap ?? cfg().pixelRatioCap ?? 1.5,
   };
 }
 
@@ -331,15 +388,8 @@ function applyQuality() {
 }
 
 function renderQuality() {
-  const q = quality();
-  for (const button of document.querySelectorAll('[data-bloom]')) {
-    button.setAttribute('aria-pressed', String((button.dataset.bloom === '1') === q.bloom));
-  }
-  for (const button of document.querySelectorAll('[data-pr]')) {
-    button.setAttribute('aria-pressed', String(Number(button.dataset.pr) === q.pixelRatioCap));
-  }
-  $('row-bloom').hidden = !realm;
-  $('row-pr').hidden = !realm;
+  renderSettings();
+  $('set-3d').hidden = !realm;
   const stats = realm?.stats();
   $('fps').textContent = !realm ? t('noScene') : stats.running ? t('fps', { fps: stats.fps, calls: stats.drawCalls }) : '';
 }
@@ -355,10 +405,13 @@ async function startScene() {
         return new DOMRect(r.left, r.top - 14, r.width, r.height + 14 + 28);
       },
       onFrame: labels.update,
+      hour: skyHour,
+      onSky: applySky,
     });
     labels.attach(realm);
+    realm.setAccent(accentShown);
     if (view.hud) {
-      realm.setState(view.hud, view.config);
+      realm.setState(view.hud, cfg());
       realm.seed(view.events);
     }
     // The free middle area changes with the window and with the panels' sizes.
@@ -368,13 +421,13 @@ async function startScene() {
     realm = null;
   }
   renderStations();
+  renderCharacter();
   renderQuality();
   labels.update();
 }
 
 // ---- Start ----
 
-setupSettings();
 renderAll();
 startScene();
 
@@ -384,22 +437,49 @@ connectLive({
     renderTop();
   },
   onHello(data) {
-    view.config = data.config;
     view.hud = data.state;
     view.events = data.history.slice(-EVENTS_KEPT);
-    realm?.setState(view.hud, view.config);
     realm?.seed(view.events);
-    renderAll();
-    applyQuality();
+    settings.setServer(data.config); // -> applyConfig: state, accent, language, quality
+    renderLog();
+    settings.retry();
+  },
+  onConfig(data) {
+    settings.setServer(data.config);
+  },
+  // The state changed without a hook event (e.g. the context size read from the transcript).
+  onState(data) {
+    view.hud = data.state;
+    realm?.setState(view.hud, cfg());
+    renderLive();
   },
   onEvent(data) {
+    const before = view.hud?.stats?.level;
     view.hud = data.state;
+    const after = view.hud?.stats?.level;
+    if (before && after > before) levelUp(after);
     realm?.onEvent(data.event);
-    realm?.setState(view.hud, view.config);
+    realm?.setState(view.hud, cfg());
     appendLog(data.event);
     renderLive();
   },
 });
+
+/** The XP of finished tool calls crossed a level: a short celebration in the HUD and the scene. */
+function levelUp(level) {
+  const banner = $('levelup');
+  $('levelup-n').textContent = `${t('lvl')} ${level}`;
+  banner.hidden = false;
+  banner.classList.remove('play');
+  void banner.offsetWidth; // restart the animation
+  banner.classList.add('play');
+  $('lvl-badge').classList.remove('pulse');
+  void $('lvl-badge').offsetWidth;
+  $('lvl-badge').classList.add('pulse');
+  realm?.levelUp();
+  clearTimeout(levelUp.timer);
+  levelUp.timer = setTimeout(() => { banner.hidden = true; }, 3600);
+}
 
 // Session timer: real elapsed time since SessionStart; paused while the tab is hidden.
 setInterval(() => {

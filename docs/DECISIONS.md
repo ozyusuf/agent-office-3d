@@ -222,3 +222,104 @@ per minute); rack LEDs lit = context / `contextBarMax` x 144, bottom row first.
 
 **D45. Label step-aside is eased (0.12 s)** so labels glide while the character walks past (stage 3
 known issue). The decor box moved to (3.1, -1.1) to clear the walk to the board.
+
+## 2026-10-09 - Stage 5
+
+**D46. Settings are saved through `POST /config` and pushed to every open page.**
+Only our own page may write: the request needs a same-origin `Origin`, the `X-Agent-Office: 1` header
+and a JSON body (a foreign page cannot send that Origin, and its custom header would need a CORS
+preflight that we never answer; Host is checked as everywhere, D6). Unlike config.json at start-up
+(D14), an update is all or nothing: an unknown key or a bad value refuses the whole update with a
+400 and the reason. The port is not editable (the hook script and the listening server read it at
+start). The server keeps every other key of config.json, writes atomically (temp file + rename),
+moves a file that is not a JSON object aside instead of overwriting it, and broadcasts
+`{ type: 'config' }` so every tab applies the change at once.
+
+**D47. Accent colour = config `accentColor` (default the measured cyan `#33b7de`).** It replaces
+`--neon-cyan`; `--neon-cyan-soft` becomes the accent with 15 % white (the measured pair is kept
+for the default). In 3D, the scene is built in the base cyan; `trackAccent()` records every material
+colour, emissive, light and vertex colour that is the base cyan (or soft cyan) times an intensity
+and `setAccent()` recolours them; glows set every frame go through `live()`. Objects built later
+(helper bots) are tracked when they are made. The reflection map is rebuilt 250 ms after the
+colour settles. Decorative screen textures (board "code", planet) keep their own colours.
+
+**D48. The settings panel replaces the per-tab gear menu (D20, D32).** Every change is saved and
+applies to all open tabs. URL parameters (`?lang`, `?bloom`, `?pr`) stay as per-tab overrides and are
+dropped when that setting is changed in the panel. Edits show at once (a local draft over the
+server's config) and are saved after 450 ms, on Enter, on blur or when the panel closes; if the
+server is away the draft stays on screen and is sent again after the reconnect. The time-bar scale
+(`sessionBarMinutes`) is in the panel too: it is the same kind of setting as the context-bar scale.
+
+## 2026-10-09 - Redesign (user request after stage 5)
+
+**D49. The look is redesigned freely; the reference image now gives only the content and placement.**
+The user found the stage 2-5 look generic ("a bit like AI slop") and asked for a design of my own.
+`docs/DESIGN.md` is the source of truth for the look; `docs/design/reference.png` still describes
+which stations exist and where they stand. Replaces "match the reference layout" for the HUD (D22).
+
+**D50. Light is information.** Station neon rests dim, below the bloom threshold (`REST` 0.3 or
+less, `lamp()` / `brighten()` in kit.js), and lights up while the station works; platform rims are
+thin accent lines; station point lights pool only where work happens; the data falls' brightness
+follows the activity rate as their speed does; a finished turn lowers the exposure by 16 %. Before,
+everything glowed at once in cyan, magenta and yellow, so the active station did not stand out.
+Bloom: strength 0.75, radius 0.5, threshold 0.85, so only working stations bloom.
+
+**D51. The HUD is an instrument, not a costume.** No glass boxes, glowing borders or angled plates:
+the scene runs full-bleed and two edge scrims keep the text legible. Bahnschrift (a DIN face that
+ships with Windows, so nothing is downloaded) in tracked small caps, tabular numbers, warm "bone"
+text (`#ece8df`) over the cool scene, hairlines, one accent; station colours appear only while that
+station works. The effort meter has 5 cells (its 5 real steps), the context meter 30 cells, the time
+meter is a line. The session state is text in the header; the level badge shows XP progress as a ring.
+Tool lines in the log are marked with their station's colour.
+
+**D52. Station labels are callouts with leader lines.** A label floats 16 px (scaled) above its
+anchor and a hairline with a dot joins them, like a callout on a technical drawing; when a label
+steps aside (D28) its leader follows. Labels stay inside the free middle area, because there are no
+glass panels to hide them behind any more (replaces D26's "the glass covers them").
+
+**D53. Colour roles in the scene.** Platform rims are all accent (no magenta rims); magenta is kept
+for helpers (portal) and the arcade; the Terminal's rings are warm (orange, accent, yellow) because
+shell = yellow in the HUD; warm "practical" lights (the desk lamp `#ffc48a`, the slit lights under
+the rims) against cool moonlight. The default title "agent-office-3d" is uppercased as English (no
+Turkish dotted İ); a custom title follows the page language.
+
+## 2026-10-09 - The sky realm (user away, free hand)
+
+**D54. The realm floats above a sea of clouds and keeps the viewer's local time.** The user asked for
+something original that I would design for myself. The platforms now float on flat-shaded rock
+islands (the stilts and the stacks that rose into a void are gone) over a sea of cumulus puffs;
+the sky follows the local clock (`daylight.js`, pure and tested): dawn glow, a bright day, a warm
+sunset, moon and stars at night, fireflies after dark. The ambient lights, the key light's direction
+(from the sun or moon), the reflections and the HUD's edge scrims follow the same time. The clock is
+decoration input, not session data; the setting `sky` (clock / dawn / day / dusk / night) and the URL
+`?hour=` fix the time. The camera is orthographic, so the sky is a gradient plane riding with the
+camera and the far clouds fade into its horizon band; everything shares one tone mapping. Daytime
+clouds stay under the bloom threshold (otherwise the glow washes the view white) and the fog only
+reaches what is far behind or deep below the islands. The old purple haze, dust and "falling
+glyph" columns are removed.
+
+**D55. The context meter shows real tokens, read from the session transcript.** It used to count
+tool calls against an arbitrary 150. `transcript_path` is a documented common hook field; the file's
+JSONL format is not documented and may lag, so `server/transcript.js` is best effort: it reads only
+the end of the file (512 KB, then 4 MB) and takes the newest of (a) the main thread's last API call
+(`input + cache writes + cache reads + output` tokens; subagent "sidechain" and synthetic messages
+are skipped) or (b) the last `compact_boundary` (`postTokens`). Checked against a real transcript:
+the sum just before a compaction (972,220) matches its `preTokens` (978,681). Only the number leaves
+the server. The window is not in the transcript, so the setting `contextWindow` decides: auto =
+200k, or 1M once more than 200k is in use (the two Claude window sizes), or a fixed number. Until
+the transcript can be read, the old tool-call fallback is shown. The rack LEDs follow the same fill.
+Reads are debounced (0.5 s after an event, again 2.5 s later because the file lags) and pushed with
+a `state` message. In the settings panel the context window replaces the tool-call scale.
+
+**D56. Celebrations come from real events.** A level up (the XP of finished tool calls crossed a
+level) throws gold sparks out of the character, sends a ring over the dais and shows a short
+"Level up · LV n" banner; a finished turn (Stop) draws a shooting star when the stars are out. The
+nameplate is hidden while there is no character (standby, session over) instead of floating over
+an empty desk.
+
+**D57. An API error is a storm; reduced motion is respected in 3D.** StopFailure already meant
+"lights out" and red rims; in a sky realm its natural form is weather: the clouds and the sky
+darken, rain falls, and a soft lightning flash comes every 3-8 s (exposure x1.8 at most, never a
+white frame). With `prefers-reduced-motion: reduce` the scene keeps still where it can: the clouds
+do not drift, stars do not twinkle, there are no shooting stars, lightning or level-up sparks (the
+ring of light stays). Closes the stage 3/4 known issue about reduced motion in the 3D scene.

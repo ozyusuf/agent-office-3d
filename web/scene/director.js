@@ -107,9 +107,9 @@ export function fallsSpeed(eventsPerMinute) {
 }
 
 /** Rack LEDs lit = context fill share of all LEDs; none while compacting (they drain). */
-export function rackTarget(focus, contextBarMax, ledCount) {
-  if (!focus || focus.compacting || !(contextBarMax > 0)) return 0;
-  return Math.round(Math.min(1, focus.context / contextBarMax) * ledCount);
+export function rackTarget(focus, fill, ledCount) {
+  if (!focus || focus.compacting) return 0;
+  return Math.round(Math.max(0, Math.min(1, fill)) * ledCount);
 }
 
 /** Scene power: on while a session runs; standby before the first event and after SessionEnd. */

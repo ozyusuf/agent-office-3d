@@ -1,7 +1,7 @@
 // Live connection to the local server, shared by the HUD and the debug view.
 // Reconnects with backoff; `hello` (history + state) arrives again after every reconnect.
 
-export function connectLive({ onHello, onEvent, onStatus }) {
+export function connectLive({ onHello, onEvent, onStatus, onConfig, onState }) {
   let retryMs = 1000;
 
   function open() {
@@ -20,6 +20,8 @@ export function connectLive({ onHello, onEvent, onStatus }) {
       }
       if (data.type === 'hello') onHello(data);
       else if (data.type === 'event') onEvent(data);
+      else if (data.type === 'config') onConfig?.(data); // settings saved from any open page
+      else if (data.type === 'state') onState?.(data); // state changed without an event (context size)
     });
     ws.addEventListener('close', () => {
       onStatus('closed');

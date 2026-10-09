@@ -5,7 +5,10 @@
   "realmSubtitle": "",
   "port": 7847,
   "contextBarMax": 150,
+  "contextWindow": "auto",
   "sessionBarMinutes": 120,
   "bloom": true,
-  "pixelRatioCap": 1.5
+  "pixelRatioCap": 1.5,
+  "accentColor": "#33b7de",
+  "sky": "clock"
 }

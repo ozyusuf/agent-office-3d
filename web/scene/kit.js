@@ -51,9 +51,120 @@ export function neon(color, intensity = 2, opts = {}) {
   return own ? make() : cached(`neon|${color}|${intensity}|${opacity}|${additive}|${side}`, make);
 }
 
-/** Sets an unlit material's colour to `color` x `intensity` (for glow that changes at runtime). */
+/**
+ * Sets an unlit material's colour to `color` x `intensity` (for glow that changes at runtime).
+ * The base cyan pair stands for the accent colour, so per-frame glows follow the setting.
+ */
 export function setGlow(material, color, intensity) {
-  material.color.setHex(color).multiplyScalar(intensity);
+  material.color.setHex(live(color)).multiplyScalar(intensity);
+}
+
+// ---- Light is information (D50) ----
+// Station neon rests dim, below the bloom threshold, so the scene is calm; while the station works
+// it lights up to (a little over) its full intensity. Where the light is tells what is going on.
+
+export const REST = 0.3;
+
+/** Neon of its own that follows a station's activity (see brighten). */
+export function lamp(color, intensity, opts = {}) {
+  const material = neon(color, intensity * REST, { ...opts, own: true });
+  material.userData.lamp = { color, intensity };
+  return material;
+}
+
+/** a: 0 = resting, 1 = working (values over 1 flash). */
+export function brighten(materials, a, rest = REST) {
+  for (const material of materials) {
+    const { color, intensity } = material.userData.lamp;
+    setGlow(material, color, intensity * (rest + (1.1 - rest) * a));
+  }
+}
+
+/** A palette colour as it is shown now: the base cyan pair becomes the accent pair. */
+export function live(color) {
+  return color === P.neonCyan ? ACCENT.main : color === P.neonCyanSoft ? ACCENT.soft : color;
+}
+
+/** CSS rgba() of a palette colour as it is shown now (for canvas drawing). */
+export function liveCss(color, alpha = 1) {
+  const c = live(color);
+  return `rgba(${(c >> 16) & 0xff}, ${(c >> 8) & 0xff}, ${c & 0xff}, ${alpha})`;
+}
+
+// ---- Accent colour (config `accentColor`, D47) ----
+// The scene is built in the measured cyan (P.neonCyan / P.neonCyanSoft). trackAccent() records every
+// colour that is one of those two times an intensity: material colours and emissives, lights and
+// vertex colours. setAccent() recolours them all. Code that sets a glow every frame reads ACCENT.
+
+/** The live accent pair (numbers). */
+export const ACCENT = { main: P.neonCyan, soft: P.neonCyanSoft };
+
+const BASE = { main: new THREE.Color(P.neonCyan), soft: new THREE.Color(P.neonCyanSoft) };
+const accentTargets = []; // { color: THREE.Color, which, k } or { attr, i, which, k }
+const trackedColors = new WeakSet();
+const trackedAttrs = new WeakSet();
+
+/** Which base colour `c` is a multiple of, and by how much; null if neither. */
+function accentMatch(r, g, b) {
+  for (const which of ['main', 'soft']) {
+    const base = BASE[which];
+    const k = b / base.b; // blue is the largest channel of both
+    const tol = 1e-4 * Math.max(1, k);
+    if (k > 0 && Math.abs(r - base.r * k) < tol && Math.abs(g - base.g * k) < tol) return { which, k };
+  }
+  return null;
+}
+
+function trackColor(color) {
+  if (!color?.isColor || trackedColors.has(color)) return;
+  trackedColors.add(color);
+  const m = accentMatch(color.r, color.g, color.b);
+  if (!m) return;
+  const target = { color, ...m };
+  accentTargets.push(target);
+  recolor(target); // objects built after an accent change get it at once
+}
+
+function recolor(target) {
+  const c = target.color ?? tmpColor;
+  c.setHex(ACCENT[target.which]).multiplyScalar(target.k);
+  if (target.attr) {
+    target.attr.setXYZ(target.i, c.r, c.g, c.b);
+    target.attr.needsUpdate = true;
+  }
+}
+const tmpColor = new THREE.Color();
+
+/** Records the accent-coloured parts of `root` and its children (call after building them). */
+export function trackAccent(root) {
+  root.traverse((obj) => {
+    if (obj.isLight) trackColor(obj.color);
+    const attr = obj.geometry?.attributes?.color;
+    if (attr && !trackedAttrs.has(attr) && attr.itemSize === 3) {
+      trackedAttrs.add(attr);
+      for (let i = 0; i < attr.count; i++) {
+        const m = accentMatch(attr.getX(i), attr.getY(i), attr.getZ(i));
+        if (m) {
+          const target = { attr, i, ...m };
+          accentTargets.push(target);
+          recolor(target);
+        }
+      }
+    }
+    const materials = Array.isArray(obj.material) ? obj.material : obj.material ? [obj.material] : [];
+    for (const material of materials) {
+      trackColor(material.color);
+      trackColor(material.emissive);
+    }
+  });
+}
+
+/** Sets the accent pair ({ main, soft } numbers) and recolours everything tracked. */
+export function setAccent({ main, soft }) {
+  if (main === ACCENT.main && soft === ACCENT.soft) return;
+  ACCENT.main = main;
+  ACCENT.soft = soft;
+  for (const target of accentTargets) recolor(target);
 }
 
 /** Moves `value` towards `target`: about 63 % of the way every `tau` seconds (frame-rate independent). */
@@ -412,9 +523,9 @@ export const TEX = {
   get sky() {
     return cached('tex|sky', () => canvasTexture(256, 512, (g, w, h) => {
       const grad = g.createRadialGradient(w * 0.5, h * 0.46, 0, w * 0.5, h * 0.46, h * 0.62);
-      grad.addColorStop(0, '#0c1d33');
-      grad.addColorStop(0.45, '#061026');
-      grad.addColorStop(1, '#03030f');
+      grad.addColorStop(0, '#0d1a2c');
+      grad.addColorStop(0.5, '#070e1b');
+      grad.addColorStop(1, '#030508');
       g.fillStyle = grad;
       g.fillRect(0, 0, w, h);
       const blob = (x, y, r, c) => {
@@ -424,8 +535,8 @@ export const TEX = {
         g.fillStyle = b;
         g.fillRect(0, 0, w, h);
       };
-      blob(w * 0.15, h * 0.22, w * 0.6, 'rgba(70,40,120,0.22)');
-      blob(w * 0.9, h * 0.7, w * 0.55, 'rgba(20,90,140,0.18)');
+      blob(w * 0.2, h * 0.2, w * 0.6, 'rgba(40,60,110,0.16)');
+      blob(w * 0.85, h * 0.72, w * 0.5, 'rgba(20,70,110,0.12)');
     }));
   },
 };
@@ -446,7 +557,7 @@ export function chamferOutline(w, d, c) {
  * Floating metal platform: chamfered slab with plated top, panelled sides, neon rim strip and
  * small slit lights on the two camera-facing sides. Returns a Group placed in world space.
  */
-export function platform({ x = 0, z = 0, w, d, top = 0, h = 0.8, chamfer = 1, rim = P.neonCyan, rimGlow = 2.0, slits = null }) {
+export function platform({ x = 0, z = 0, w, d, top = 0, h = 0.8, chamfer = 1, rim = P.neonCyan, rimGlow = 0.8, slits = null }) {
   const group = new THREE.Group();
   group.position.set(x, top, z);
 
@@ -499,7 +610,7 @@ export function platform({ x = 0, z = 0, w, d, top = 0, h = 0.8, chamfer = 1, ri
         parts.push(g);
       }
     }
-    group.add(new THREE.Mesh(mergeGeometries(parts), neon(slits, 2.2)));
+    group.add(new THREE.Mesh(mergeGeometries(parts), neon(slits, 1.25)));
   }
   return group;
 }

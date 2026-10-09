@@ -8,15 +8,15 @@ narrow portrait browser window next to VS Code. Open source; a "how it was built
 ## Architecture
 Claude Code hooks -> local server (127.0.0.1 only) -> WebSocket -> three.js page.
 - `hooks/send-event.ps1` - PowerShell hook script. Forwards the raw hook JSON (stdin) to `POST /event`.
-- `server/index.js` - Node HTTP + `ws` server: receives events, reorders by hook start time,
-  keeps recent history, broadcasts event + state snapshot, serves `web/`, `GET /state`, and
-  three.js from `node_modules` under `/vendor/three/` (import map in `index.html`).
+- `server/index.js` - Node HTTP + `ws`: `POST /event` (reorder by hook start time, history, broadcast
+  event + state), `POST /config` (settings panel), `GET /state`, serves `web/` + three.js at `/vendor/three/`.
 - `server/normalize.js` - raw hook JSON -> small display event. `server/state.js` - session state
-  machine + level curve (the HUD only renders it). `server/config.js`, `server/stats.js` - config.json, XP file.
-- `web/` - plain ES modules, no build step: `index.html` HUD (`app.js`, `hud.css`, `theme.css`,
-  `i18n.js`, `narrate.js`, `stations.js`, `labels.js`, `palette.js`), `debug.html` raw event list.
+  machine + level curve. `server/transcript.js` - context tokens from the transcript. `config.js`, `stats.js`.
+- `web/` - plain ES modules, no build step: HUD `index.html` + `app.js`, `hud.css`, `theme.css`, `i18n.js`,
+  `narrate.js`, `stations.js`, `labels.js`, `palette.js`, `settings.js`, `context.js`; `debug.html` raw events.
   3D scene in `web/scene/`: `realm.js` (renderer, camera, bloom, loop, state -> `drive`), `director.js`
-  + `walk.js` (pure, tested), `world.js`, `props.js` (stations), `character.js`, `helpers.js`, `kit.js`.
+  + `walk.js` + `daylight.js` (pure, tested), `world.js`, `sky.js`, `props.js`, `character.js`, `helpers.js`,
+  `effects.js`, `kit.js`.
 - Local files (gitignored): `config.json` (see `config.example.json`), `data/stats.json` (XP).
 
 ## Hard rules
@@ -31,7 +31,7 @@ Claude Code hooks -> local server (127.0.0.1 only) -> WebSocket -> three.js page
 - Stack: Node.js, `ws`, three.js (ES modules). No frameworks, no bundler.
 - Never show made-up data. Every number and bar on screen must come from a real hook event.
 - Server binds to 127.0.0.1 only and checks Host/Origin headers.
-- Visual work: follow `docs/DESIGN.md`; look at `docs/design/reference.png` when in doubt.
+- Visual work: follow `docs/DESIGN.md` (source of truth); `docs/design/reference.png` = station placement only.
 - Performance: cap pixel ratio, stop rendering when the tab is hidden, bloom can be turned off.
 
 ## Working with the user

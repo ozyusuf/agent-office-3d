@@ -20,3 +20,27 @@ export const PALETTE = Object.freeze({
   text: 0xe6f6ff,
   textDim: 0x8aa4c0,
 });
+
+export const DEFAULT_ACCENT = '#33b7de';
+const SOFT_WHITE = 0.15; // the measured soft cyan is the cyan with about 15 % white mixed in
+
+/**
+ * Accent colour (config `accentColor`, "#rrggbb") -> the two tokens it replaces: `main` for
+ * --neon-cyan / neonCyan, `soft` for --neon-cyan-soft / neonCyanSoft. The default gives the
+ * measured pair; any other colour gets its soft tone by mixing in white. Invalid -> default.
+ * @returns {{ main: number, soft: number, css: { main: string, soft: string } }}
+ */
+export function accentPair(hex) {
+  const valid = typeof hex === 'string' && /^#[0-9a-f]{6}$/i.test(hex);
+  const main = valid ? parseInt(hex.slice(1), 16) : PALETTE.neonCyan;
+  let soft = PALETTE.neonCyanSoft;
+  if (main !== PALETTE.neonCyan) {
+    soft = 0;
+    for (const shift of [16, 8, 0]) {
+      const c = (main >> shift) & 0xff;
+      soft |= Math.round(c + (255 - c) * SOFT_WHITE) << shift;
+    }
+  }
+  const css = (n) => `#${n.toString(16).padStart(6, '0')}`;
+  return { main, soft, css: { main: css(main), soft: css(soft) } };
+}

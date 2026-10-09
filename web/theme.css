@@ -1,5 +1,6 @@
-/* Palette and shared tokens from docs/DESIGN.md section 2. The 3D code mirrors these in palette.js
-   (stage 3). Stage 5's accent colour replaces --neon-cyan; derived tokens follow it via color-mix. */
+/* Palette and shared tokens (docs/DESIGN.md section 2). The 3D code mirrors the colours in
+   palette.js. The accent colour setting replaces --neon-cyan and --neon-cyan-soft (app.js); every
+   token derived from them with color-mix follows. */
 :root {
   color-scheme: dark;
 
@@ -20,24 +21,33 @@
   --warn-yellow: #f4c752;
   --ok-green: #56d999;
   --alert-red: #ff3b5c; /* derived */
-  --text: #e6f6ff; /* derived */
-  --text-dim: #8aa4c0; /* derived */
 
-  /* HUD glass */
-  --glass-fill: rgb(14 33 59 / 0.72);
-  --glass-border: color-mix(in srgb, var(--neon-cyan) 60%, transparent);
-  --glass-glow: 0 0 12px color-mix(in srgb, var(--neon-cyan) 35%, transparent);
-  --radius: 5px;
+  /* Ink and paper (derived, redesign D51): warm text over a cool night scene */
+  --ink: #060910;
+  --ink-raised: #0b111c;
+  --text: #ece8df;
+  --text-soft: #b8bcc6;
+  --text-dim: #858d9c;
+  --text-faint: #4f5767;
+  --hair: rgb(236 232 223 / 0.13);
+  --hair-strong: rgb(236 232 223 / 0.24);
+  --accent: var(--neon-cyan);
+  --accent-soft: var(--neon-cyan-soft);
+  --lamp: #ffc48a; /* the desk lamp in the scene */
 
-  /* Skill colours (skill bar) */
-  --skill-read: color-mix(in srgb, var(--neon-purple) 55%, var(--neon-cyan-soft));
+  /* Station colours: used only while that station works */
+  --skill-read: var(--accent-soft);
   --skill-search: var(--ok-green);
   --skill-edit: var(--fire-orange);
   --skill-shell: var(--warn-yellow);
-  --skill-web: var(--neon-cyan-soft);
+  --skill-web: #6aa8ff;
   --skill-permission: var(--warn-yellow);
+  --skill-helper: var(--neon-magenta);
+  --skill-idle: var(--neon-purple);
 
-  /* Fonts: system fonts with Turkish glyphs; no downloads */
-  --font-ui: Bahnschrift, "Segoe UI", system-ui, sans-serif;
-  --font-mono: Consolas, "Cascadia Mono", ui-monospace, monospace;
+  --radius: 6px;
+
+  /* Fonts: system fonts with Turkish glyphs, no downloads. Bahnschrift is a DIN (instrument) face. */
+  --font-ui: Bahnschrift, "DIN Alternate", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, ui-monospace, "SF Mono", monospace;
 }

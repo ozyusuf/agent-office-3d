@@ -173,6 +173,8 @@ export class HudState {
         effort: null,
         context: 0,
         contextExact: false, // exact after SessionStart(startup/clear/compact) or PostCompact
+        tokens: null, // tokens in the main agent's context, from the transcript (server/transcript.js)
+        tokensModel: null,
         toolsDone: 0,
         turn: false,
         turnEnded: false, // the last turn finished (Stop, StopFailure, interrupt) and no new one began
@@ -187,6 +189,15 @@ export class HudState {
     }
     this.focusId = id;
     return s;
+  }
+
+  /** Context size read from the session's transcript; true if it changed. */
+  setContextTokens(sessionId, { tokens, model }) {
+    const s = this.sessions.get(sessionId);
+    if (!s || (s.tokens === tokens && s.tokensModel === (model ?? s.tokensModel))) return false;
+    s.tokens = tokens;
+    if (model) s.tokensModel = model;
+    return true;
   }
 
   #prune(keepId) {
@@ -252,6 +263,8 @@ function view(s) {
     effort: s.effort,
     context: s.context,
     contextExact: s.contextExact,
+    tokens: s.tokens,
+    tokensModel: s.tokensModel,
     toolsDone: s.toolsDone,
     turnEnded: s.turnEnded,
     activity: current

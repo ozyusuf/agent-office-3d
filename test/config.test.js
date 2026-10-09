@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { DEFAULTS, parseConfig, loadConfig } from '../server/config.js';
+import { DEFAULTS, EDITABLE, parseConfig, loadConfig, checkUpdate, saveConfig } from '../server/config.js';
 import { loadStats, createStatsWriter } from '../server/stats.js';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-office-test-'));
@@ -52,6 +52,58 @@ test('broken JSON or BOM', () => {
   const bom = path.join(tmp, 'bom.json');
   fs.writeFileSync(bom, '﻿{"language":"tr"}');
   assert.equal(loadConfig(bom, {}).config.language, 'tr');
+});
+
+test('accent colour: #rrggbb, stored in lower case', () => {
+  assert.equal(parseConfig({ accentColor: ' #E350A4 ' }, {}).config.accentColor, '#e350a4');
+  for (const bad of ['red', '#fff', '#12345g', 123, '']) {
+    const r = parseConfig({ accentColor: bad }, {});
+    assert.equal(r.config.accentColor, DEFAULTS.accentColor, String(bad));
+    assert.equal(r.warnings.length, 1);
+  }
+});
+
+test('settings panel update: every key except the port, all or nothing', () => {
+  assert.ok(!EDITABLE.includes('port'));
+  assert.deepEqual(EDITABLE.toSorted(), Object.keys(DEFAULTS).filter((k) => k !== 'port').sort());
+  const ok = checkUpdate({ agentName: '  Şimşek ', accentColor: '#AABBCC', bloom: false, contextBarMax: 200, language: 'tr' });
+  assert.deepEqual(ok.errors, []);
+  assert.deepEqual(ok.values, { agentName: 'Şimşek', accentColor: '#aabbcc', bloom: false, contextBarMax: 200, language: 'tr' });
+  assert.deepEqual(checkUpdate({ realmTitle: '' }).values, { realmTitle: '' }); // empty = default title
+  const refused = (patch) => checkUpdate(patch).errors.map((e) => e.key);
+  assert.deepEqual(refused({ port: 8000 }), ['port']);
+  assert.deepEqual(refused({ agentName: 'x', nope: 1 }), ['nope']);
+  assert.deepEqual(refused({ contextBarMax: 5, sessionBarMinutes: 30.5, pixelRatioCap: '2' }), ['contextBarMax', 'sessionBarMinutes', 'pixelRatioCap']);
+  assert.deepEqual(refused({ agentName: 'x'.repeat(41) }), ['agentName']);
+  for (const bad of [null, [], 'text', {}]) assert.equal(checkUpdate(bad).errors.length, 1);
+});
+
+test('saveConfig keeps the other keys of config.json and survives a reload', () => {
+  const file = path.join(tmp, 'save.json');
+  fs.writeFileSync(file, '﻿{ "port": 8123, "language": "en", "agentName": "Old" }');
+  const r = saveConfig(file, { agentName: 'Şimşek', accentColor: '#e350a4' }, {});
+  assert.equal(r.config.agentName, 'Şimşek');
+  assert.equal(r.config.port, 8123);
+  const onDisk = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.deepEqual(onDisk, { port: 8123, language: 'en', agentName: 'Şimşek', accentColor: '#e350a4' });
+  assert.deepEqual(loadConfig(file, {}).config, r.config); // what a restarted server reads
+  assert.ok(!fs.existsSync(`${file}.tmp`));
+  // env port is never written into the file
+  saveConfig(file, { bloom: false }, { AGENT_OFFICE_PORT: '9001' });
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).port, 8123);
+});
+
+test('saveConfig creates a missing file and moves a broken one aside', () => {
+  const fresh = path.join(tmp, 'fresh', 'config.json');
+  fs.mkdirSync(path.dirname(fresh));
+  saveConfig(fresh, { language: 'tr' }, {});
+  assert.deepEqual(JSON.parse(fs.readFileSync(fresh, 'utf8')), { language: 'tr' });
+  const broken = path.join(tmp, 'fresh', 'broken.json');
+  fs.writeFileSync(broken, '{ "language": ');
+  const r = saveConfig(broken, { language: 'tr' }, {});
+  assert.match(r.warnings[0], /moved/);
+  assert.ok(fs.readdirSync(path.dirname(broken)).some((f) => f.startsWith('broken.json.unreadable-')));
+  assert.equal(loadConfig(broken, {}).config.language, 'tr');
 });
 
 test('stats file: missing -> 0, save + flush -> reload', () => {
