@@ -1,9 +1,9 @@
 # Progress
 
 ## Current state
-- **Stage 8 (glance status) built, v0.3.0** (2026-10-09, D68): green / yellow / red window frame,
+- **Stage 8 (glance status) done, v0.3.0** (2026-10-09, D68): green / yellow / red window frame,
   `?` `!` `✓` `✕` bubble over the nameplate, header chip "Done · 4m 05s", questions and plan
-  approvals count as waiting. Open: the user's live check on the tablet.
+  approvals count as waiting. The user checked it live on the tablet: works.
 - Stage 7 (performance, v0.2.0, D67) done; README "Update" section + CHANGELOG.md for installed users.
 - Plan limits cannot be shown in the VS Code extension (D69).
 - Run: `npm install`, `npm start`, open http://127.0.0.1:7847 (HUD) or /debug.html (raw events).
@@ -35,7 +35,7 @@
   toggle saves `statusFrame: false`; no console errors; CPU same as HEAD within noise (a floating
   done bubble cost ~6 %, so it stays still). 103 tests pass.
 
-**Left:** the user's live check on the tablet (a real question, permission and finished turn).
+**Left:** nothing for stage 8 (the user checked it live on the tablet afterwards: works).
 
 **Known issues / open questions**
 - CPU % numbers depend on the machine's power state: the same HEAD measured 48 % idle earlier and

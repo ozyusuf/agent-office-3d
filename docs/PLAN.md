@@ -105,7 +105,7 @@ picture and no new console errors.
 - [x] Setting `statusFrame` (on / off)
 - [x] Screenshots of every state; hop checked; CPU same as 0.2.0 (the done bubble stays still)
 - [x] Plan limits researched: not available in the VS Code extension (D69)
-- [ ] Live check by the user: a real question, permission and finished turn seen on the tablet
+- [x] Live check by the user: a real question, permission and finished turn seen on the tablet (2026-10-09)
 
 **Done when:** from across the room the user can tell working / needs you / done apart on the
 tablet, in a real session.
