@@ -12,6 +12,11 @@ Wrap up this session of agent-office-3d.
 3. `docs/DECISIONS.md`: append any new decisions made this session (date - decision - why).
    If a decision replaced an older one, say which.
 4. If anything in `CLAUDE.md` or `docs/DESIGN.md` is now out of date, fix it (CLAUDE.md max 60 lines).
+   If users would notice the change (new feature, fix, setting, hook change), add it to
+   `CHANGELOG.md` for people who already installed it: plain words, what they get, and
+   anything they must do after updating (e.g. "run install.ps1 again: new hook event").
+   Bump the version in `package.json` (`npm version x.y.z --no-git-tag-version`) when a set of
+   changes is released.
 5. Run `npm test` if tests exist. Report failures honestly; do not commit broken tests silently.
 6. `git status`, then stage the relevant files and commit with a short English message
    (`stage N: ...`). Never commit `node_modules/`, local config, or stats files.

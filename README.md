@@ -76,6 +76,32 @@ from the new place. Running it twice is safe; it only adds what is missing.
   `config.example.json`) and restart the server; the hook reads the same file.
 - **Raw events:** http://127.0.0.1:7847/debug.html shows every hook event as it arrives.
 
+## Update
+
+agent-office-3d is still growing. [CHANGELOG.md](CHANGELOG.md) lists what each version changed;
+http://127.0.0.1:7847/health shows the version you are running. To get the latest one, open
+PowerShell in the project folder and run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\stop.ps1
+git pull
+powershell -ExecutionPolicy Bypass -File install.ps1
+```
+
+1. `stop.ps1` stops the running server (an old server keeps running the old code).
+2. `git pull` downloads the new version. Your settings (`config.json`) and your level
+   (`data/`) are not part of the repository, so they stay as they are.
+3. `install.ps1` installs new packages and checks the hook. If the hook entry is unchanged it
+   says there is nothing to change; if a new version needs another hook event, it shows the
+   change and asks first, as on the first install. Then it starts the server and opens the monitor.
+
+Installed from a ZIP? Stop the server, download the new ZIP from GitHub, unpack it **over the old
+folder** (same place, replace the files), then run `install.ps1` as above.
+
+If `git pull` stops with "your local changes would be overwritten", you edited a project file (often
+`package-lock.json` after an `npm install`). Run `git checkout -- package-lock.json` (or the file it
+names) and `git pull` again. An already open monitor window only needs a reload (F5).
+
 ## Uninstall
 
 ```powershell

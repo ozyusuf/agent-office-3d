@@ -53,8 +53,8 @@ Never send test events to the server the user watches. Test the hook by hand (Po
 `'{"hook_event_name":"Stop","session_id":"t"}' | powershell -NoProfile -ExecutionPolicy Bypass -File hooks/send-event.ps1`
 
 ## Docs map
-- `docs/PLAN.md` - stages, checkbox tasks, "done" criteria per stage.
-- `docs/DESIGN.md` - palette, screen layout, scene objects, event -> reaction table.
+- `docs/PLAN.md` - stages, tasks, "done when". `docs/DESIGN.md` - palette, screen layout, scene objects, event -> reaction table.
 - `docs/PROGRESS.md` - session log. `docs/DECISIONS.md` - decisions and why.
 - `docs/HOW-IT-WAS-BUILT.md` - public guide. `docs/screenshots/` - README images (real sessions only, D62).
+- `CHANGELOG.md` - user-facing changes per version (README "Update" says how users update).
 - `.claude/commands/next.md` (`/next`), `.claude/commands/wrap.md` (`/wrap`).
