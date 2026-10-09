@@ -21,6 +21,7 @@ export const DEFAULTS = Object.freeze({
   maxFps: 60, // most frames per second the 3D scene draws (it draws fewer while calm, D67)
   accentColor: '#33b7de', // replaces the neon cyan in the HUD and the 3D scene (default = measured cyan)
   sky: 'clock', // the realm's sky: follows the local time, or stays at dawn / day / dusk / night
+  statusFrame: true, // window frame: green = the user's turn, yellow = needs the user, red = error (D68)
 });
 
 export const SKIES = ['clock', 'dawn', 'day', 'dusk', 'night'];
@@ -47,6 +48,7 @@ const RULES = {
   maxFps: (v) => v === 30 || v === 60,
   accentColor: (v) => typeof v === 'string' && /^#[0-9a-f]{6}$/.test(v),
   sky: (v) => SKIES.includes(v),
+  statusFrame: bool,
 };
 
 /** Trims strings; colours are stored in lower case. */

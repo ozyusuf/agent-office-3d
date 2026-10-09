@@ -103,3 +103,30 @@ test('station labels: valid modes, fallback slots, names in every language', () 
     for (const lang of LANGS) assert.ok(keysOf(lang).includes(`station.${station.key}`), `${lang} ${station.key}`);
   }
 });
+
+test('glance: a word, a caption and a bubble mark for every status, in both languages', async () => {
+  const { glanceOf } = await import('../web/narrate.js');
+  const focuses = [
+    [{ status: 'working', activity: { kind: 'edit', target: 'app.js' } }, 'work', 'working', null],
+    [{ status: 'idle', turnEnded: true }, 'turn', 'done', '✓'],
+    [{ status: 'idle', turnEnded: false }, 'turn', 'ready', '✓'],
+    [{ status: 'waiting', waitFor: 'permission', permission: { tool: 'Bash', target: 'npm test' } }, 'wait', 'permission', '!'],
+    [{ status: 'waiting', waitFor: 'question', activity: { tool: 'AskUserQuestion', kind: 'ask', target: 'Framework' } }, 'wait', 'question', '?'],
+    [{ status: 'waiting', waitFor: 'plan', activity: { tool: 'ExitPlanMode', kind: 'ask' } }, 'wait', 'plan', '?'],
+    [{ status: 'error', error: { error: 'rate_limit' } }, 'error', 'error', '✕'],
+  ];
+  for (const lang of LANGS) {
+    const t = makeTranslator(lang);
+    assert.equal(glanceOf(null, t), null);
+    assert.equal(glanceOf({ status: 'ended' }, t), null);
+    for (const [focus, kind, key, mark] of focuses) {
+      const glance = glanceOf(focus, t);
+      assert.equal(glance.kind, kind);
+      assert.equal(glance.key, key);
+      assert.equal(glance.mark, mark);
+      const caption = glance.caption.map((p) => (typeof p === 'string' ? p : p.v)).join('');
+      assert.ok(glance.word && caption, `${lang} ${key}`);
+      assert.ok(!/[{}[\]]/.test(glance.word + caption), `${lang} ${key}: ${caption}`);
+    }
+  }
+});

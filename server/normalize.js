@@ -17,6 +17,9 @@ const TOOL_KINDS = {
   WebFetch: 'web', WebSearch: 'web',
   Agent: 'agent', Task: 'agent',
   TodoWrite: 'task', TaskCreate: 'task', TaskUpdate: 'task', TaskList: 'task', TaskGet: 'task',
+  // The agent waits for the user: a multiple-choice question, or a plan to approve (hooks docs:
+  // both "require user interaction" and run until the user answers).
+  AskUserQuestion: 'ask', ExitPlanMode: 'ask',
 };
 
 const MAX_TEXT = 160;
@@ -117,6 +120,9 @@ function describeTool(tool, input, cwd) {
       return Array.isArray(input.todos) ? { target: `${input.todos.length} todos`, todos: countTodos(input.todos) } : {};
     case 'Skill':
       return { target: oneLine(input.skill || input.command, MAX_TEXT) };
+    case 'AskUserQuestion':
+      // Only the short header chip of the first question (e.g. "Framework"), not the question.
+      return Array.isArray(input.questions) ? { target: oneLine(input.questions[0]?.header, 40) } : {};
   }
   if (tool.startsWith('mcp__')) return { target: tool.split('__').slice(1).join(' / ') };
   return {};

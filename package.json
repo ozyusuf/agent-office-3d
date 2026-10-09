@@ -1,6 +1,6 @@
 {
   "name": "agent-office-3d",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A cyber-RPG 3D live monitor that shows what your Claude Code agent is doing right now.",
   "license": "MIT",
   "type": "module",

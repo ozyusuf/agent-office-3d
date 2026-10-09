@@ -25,7 +25,11 @@ stations), and a station lights up only while it is in use:
 | Server Racks | context fill (LEDs) and compaction |
 | Arcade | the agent plays here after a finished turn |
 
-Waiting for permission turns the desk light yellow; an API error brings a storm. The HUD shows the
+Waiting for permission turns the desk light yellow; an API error brings a storm. You can tell from
+across the room whether Claude needs you: the window frame turns **green** when the task is done
+(your turn), **yellow** when Claude asks a question, wants a plan approved or needs a permission (a
+small `?` or `!` bubble hops over the character), **red** on an error, and has no colour while
+Claude works. Handy with the monitor on a second screen or a tablet. The HUD shows the
 context size in tokens, the effort level, the session time, a log of hook events and a level that
 grows with every finished tool call. Every number on screen comes from a real Claude Code hook event.
 
@@ -70,7 +74,7 @@ from the new place. Running it twice is safe; it only adds what is missing.
   window). When the server is not running the hook exits at once and Claude Code is not affected.
 - **Settings:** the gear icon at the top right: agent name, title, language (English / Turkish),
   accent colour, sky (your clock, or a fixed dawn / day / dusk / night), 3D quality (bloom, pixel
-  ratio, max frame rate), context window.
+  ratio, max frame rate), status frame on / off, context window.
   Changes apply at once in every open tab and are saved to `config.json`.
 - **Port:** 7847 by default. To change it, put `"port": 7848` in `config.json` (see
   `config.example.json`) and restart the server; the hook reads the same file.

@@ -1,12 +1,11 @@
 # Progress
 
 ## Current state
-- **Stage 7 (performance) done** (2026-10-09, D67): frame pacing 60 / 30 / 15 fps by what moves,
-  single-pass transparent sheets, static world merged, no per-frame forced layout, still status
-  halo, `maxFps` setting (60 / 30). CPU (renderer + GPU process) -35 to -65 % in every state.
-- Stage 6 done: installer, README, guide, screenshots, Code Editor (D63), livelier character (D64),
-  Unicode-safe shortcuts (D66). The user's friend installed it on another Windows machine: works.
-  Open: a real log-in with the login shortcut; no GIF (optional).
+- **Stage 8 (glance status) built, v0.3.0** (2026-10-09, D68): green / yellow / red window frame,
+  `?` `!` `✓` `✕` bubble over the nameplate, header chip "Done · 4m 05s", questions and plan
+  approvals count as waiting. Open: the user's live check on the tablet.
+- Stage 7 (performance, v0.2.0, D67) done; README "Update" section + CHANGELOG.md for installed users.
+- Plan limits cannot be shown in the VS Code extension (D69).
 - Run: `npm install`, `npm start`, open http://127.0.0.1:7847 (HUD) or /debug.html (raw events).
   Restart the server after pulling new server code (an old `node server/index.js` keeps running
   the old code). `?hour=0..24` fixes the sky's time for one tab.
@@ -14,6 +13,38 @@
   in `data/stats.json` (gitignored).
 
 ## Session log (newest first)
+
+### 2026-10-09 - Session 9 - Stage 8 (glance status) + update docs
+**Done**
+- Update docs for installed users: README "Update" (stop, `git pull`, `install.ps1`, ZIP installs,
+  local-change conflicts), `CHANGELOG.md`, version 0.2.0, `/wrap` adds user-facing changes there.
+- Stage 8 (user: see from another room, on a tablet used as a second screen, whether Claude works,
+  asks something or is done). Verified in the hooks docs: AskUserQuestion / ExitPlanMode run as
+  tools until the user answers, so no new hook event is needed.
+- Server: `waitFor` (permission / question / plan), `statusSince` / `statusExact`, AskUserQuestion
+  keeps only the first question's header chip. Client: `glanceOf()`; window frame (setting
+  `statusFrame`), bubble on the nameplate (hops only while waiting, moved on rendered frames),
+  header chip and tab title with since when, nameplate "Done, your turn", log lines for questions
+  and plans. Version 0.3.0.
+- A first version with a big status band was built and shown; the user found the text too big and
+  wanted the character to show it, but liked the green frame: band removed (D68).
+- Plan limits (D69): the status line JSON has `rate_limits`, but a probe `statusLine` in
+  `.claude/settings.local.json` never ran in the VS Code extension (probe removed).
+- Checks: scratch server (port 7863, scratch config/data): screenshots of working / done /
+  question / permission / error at 600x1000, 420x900, 702x765, 1280x800; hop sampled; settings
+  toggle saves `statusFrame: false`; no console errors; CPU same as HEAD within noise (a floating
+  done bubble cost ~6 %, so it stays still). 103 tests pass.
+
+**Left:** the user's live check on the tablet (a real question, permission and finished turn).
+
+**Known issues / open questions**
+- CPU % numbers depend on the machine's power state: the same HEAD measured 48 % idle earlier and
+  93 % later in the day; compare versions side by side only.
+- A question asked in plain text ends with Stop: shown as Done (the user's turn), not as a question.
+- Once in headless Edge the 3D scene did not start (labels fell back to slots); not reproducible.
+
+**Next step:** the user tries v0.3.0 on the tablet; adjust bubble size / frame width from their
+feedback. Optional: a GitHub release so watchers get notified; limits for CLI users (D69).
 
 ### 2026-10-09 - Session 8 - Stage 7 (performance, user request)
 **Done**

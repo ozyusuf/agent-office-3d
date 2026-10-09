@@ -4,7 +4,7 @@
 
 import { connectLive } from './ws.js';
 import { LANGS, makeTranslator } from './i18n.js';
-import { logEntry, activityParts, formatDuration } from './narrate.js';
+import { logEntry, activityParts, glanceOf, formatDuration } from './narrate.js';
 import { STATIONS, activeStations } from './stations.js';
 import { createLabelLayer } from './labels.js';
 import { createSettings } from './settings.js';
@@ -64,6 +64,45 @@ function renderLive() {
   renderStations();
   renderSkills();
   renderTint();
+  renderGlance();
+}
+
+/** The glance state (D68): the window frame and the bubble over the nameplate. */
+function renderGlance() {
+  const glance = view.hud ? glanceOf(view.hud.focus, t) : null;
+  $('frame').dataset.kind = cfg().statusFrame !== false && glance && glance.kind !== 'work' ? glance.kind : '';
+  const bubble = $('bubble');
+  const mark = glance?.mark ?? '';
+  if (bubble.hidden !== !mark) bubble.hidden = !mark;
+  bubble.textContent = mark;
+  bubble.dataset.kind = glance?.kind ?? '';
+}
+
+// The bubble hops while Claude waits for the user (moved on every rendered 3D frame, at the
+// scene's pace, not by an endless CSS animation, D67). Done and error stay still: they can last
+// for hours, and a moving bubble is repainted every frame (~6 % CPU measured).
+const HOP_S = 1.1;
+const calmMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+function moveBubble() {
+  const bubble = $('bubble');
+  const hop = !bubble.hidden && !calmMotion && bubble.dataset.kind === 'wait';
+  if (!hop) {
+    if (bubble.style.transform) bubble.style.transform = '';
+    return;
+  }
+  const p = ((performance.now() / 1000) % HOP_S) / HOP_S;
+  const y = p < 0.42 ? -9 * Math.sin((p / 0.42) * Math.PI) : 0;
+  bubble.style.transform = `translateY(${y.toFixed(1)}px)`;
+}
+
+/** Header chip: the glance word and since when ("Done · 4m 05s"); "≥" when the server joined late. */
+function statusText(focus) {
+  const glance = glanceOf(focus, t);
+  if (!glance) return t(`status.${focus?.status ?? 'none'}`);
+  const since = focus.statusSince;
+  return Number.isFinite(since)
+    ? `${glance.word} · ${focus.statusExact ? '' : '≥'}${formatDuration(Date.now() - since, t)}`
+    : glance.word;
 }
 
 // Scene tint: yellow while waiting for permission, red after an API error (StopFailure).
@@ -112,7 +151,9 @@ function renderTop() {
   $('realm-title').textContent = title;
   // The app's own name is English: uppercase it as English (no Turkish İ); a custom title follows the page.
   $('realm-title').lang = cfg().realmTitle ? '' : 'en';
-  document.title = title;
+  // The tab / taskbar title starts with the glance word ("Done · agent-office-3d").
+  const glance = view.hud ? glanceOf(view.hud.focus, t) : null;
+  document.title = glance ? `${glance.word} · ${title}` : title;
   const subtitle = cfg().realmSubtitle || view.hud?.focus?.project || '';
   $('realm-subtitle').textContent = subtitle;
   // Hidden when unknown, or when it would repeat the title (e.g. working in this repo itself).
@@ -120,7 +161,9 @@ function renderTop() {
 
   setIcon($('icon-conn'), view.conn, t(`conn.${view.conn}`));
   const status = view.hud?.focus?.status ?? 'none';
-  setIcon($('icon-session'), status, t(`status.${status}`));
+  const caption = glance ? glance.caption.map((p) => (typeof p === 'string' ? p : p.v)).join('') : t(`status.${status}`);
+  setIcon($('icon-session'), status, caption);
+  $('icon-session').dataset.glance = glance?.kind ?? '';
 }
 
 function setIcon(node, state, label) {
@@ -133,7 +176,7 @@ function renderStats() {
   const focus = view.hud?.focus;
   const status = focus?.status ?? 'none';
   $('stats').dataset.status = status;
-  $('status-text').textContent = view.hud ? t(`status.${status}`) : t('connecting');
+  $('status-text').textContent = view.hud ? statusText(focus) : t('connecting');
   $('stats-empty').hidden = Boolean(focus);
   $('meters').hidden = !focus;
   $('tools-done').textContent = focus ? t('toolsDone', { n: focus.toolsDone }) : '';
@@ -230,7 +273,7 @@ function renderSkills() {
     let state = 'idle';
     let name = t(`skill.${key}`);
     if (key === 'permission') {
-      if (focus?.status === 'waiting') {
+      if (focus?.waitFor === 'permission') {
         state = 'waiting';
         name = t('skill.permissionWaiting');
       }
@@ -408,7 +451,10 @@ async function startScene() {
         const r = $('middle').getBoundingClientRect();
         return new DOMRect(r.left, r.top - 14, r.width, r.height + 14 + 28);
       },
-      onFrame: labels.update,
+      onFrame: () => {
+        labels.update();
+        moveBubble();
+      },
       hour: skyHour,
       onSky: applySky,
     });
@@ -485,7 +531,10 @@ function levelUp(level) {
   levelUp.timer = setTimeout(() => { banner.hidden = true; }, 3600);
 }
 
-// Session timer: real elapsed time since SessionStart; paused while the tab is hidden.
+// Session timer and the header's "since": real elapsed time; paused while the tab is hidden.
 setInterval(() => {
-  if (!document.hidden && view.hud?.focus && view.hud.focus.endedAt === null) renderTime();
+  if (!document.hidden && view.hud?.focus && view.hud.focus.endedAt === null) {
+    renderTime();
+    $('status-text').textContent = statusText(view.hud.focus);
+  }
 }, 1000);

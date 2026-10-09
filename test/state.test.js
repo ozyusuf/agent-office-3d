@@ -240,3 +240,65 @@ test('TodoWrite counts reach the activity', () => {
   const { focus } = run([ev('UserPromptSubmit'), pre('TodoWrite', 'task', 't1', { todos: { total: 4, done: 1, doing: 1 } })]);
   assert.deepEqual(focus.activity.todos, { total: 4, done: 1, doing: 1 });
 });
+
+// ---- Glance band: what the agent waits for, and since when ----
+
+test('a question or a plan to approve waits for the user until it is answered', () => {
+  const start = [ev('SessionStart', { source: 'startup' }), ev('UserPromptSubmit')];
+  let { focus } = run([...start, pre('AskUserQuestion', 'ask', 'q1', { target: 'Framework' })]);
+  assert.equal(focus.status, 'waiting');
+  assert.equal(focus.waitFor, 'question');
+  ({ focus } = run([...start, pre('AskUserQuestion', 'ask', 'q1'), post('AskUserQuestion', 'ask', 'q1')]));
+  assert.equal(focus.status, 'working');
+  assert.equal(focus.waitFor, null);
+  ({ focus } = run([...start, pre('ExitPlanMode', 'ask', 'p1')]));
+  assert.equal(focus.waitFor, 'plan');
+  // A permission dialog for the same tool still says what it is about.
+  ({ focus } = run([...start, pre('ExitPlanMode', 'ask', 'p1'), ev('PermissionRequest', { tool: 'ExitPlanMode' })]));
+  assert.equal(focus.waitFor, 'plan');
+  ({ focus } = run([...start, pre('Bash', 'shell', 'b1'), ev('PermissionRequest', { tool: 'Bash' })]));
+  assert.equal(focus.waitFor, 'permission');
+  // A subagent's call never asks the user.
+  ({ focus } = run([...start, pre('AskUserQuestion', 'ask', 'q2', { agentId: 'a1' })]));
+  assert.equal(focus.status, 'working');
+  // Esc on the question ends the turn: the user's turn.
+  ({ focus } = run([...start, pre('AskUserQuestion', 'ask', 'q1'), ev('PostToolUseFailure', { tool: 'AskUserQuestion', toolUseId: 'q1', interrupted: true })]));
+  assert.equal(focus.status, 'idle');
+});
+
+test('status since: the turn while working, the change otherwise', () => {
+  const hud = new HudState();
+  hud.apply(ev('SessionStart', { source: 'startup' }));
+  const prompt = ev('UserPromptSubmit');
+  hud.apply(prompt);
+  hud.apply(pre('Bash', 'shell', 'b1'));
+  const ask = ev('PermissionRequest', { tool: 'Bash' });
+  hud.apply(ask);
+  let focus = hud.snapshot().focus;
+  assert.equal(focus.status, 'waiting');
+  assert.equal(focus.statusSince, ask.hookTs);
+  assert.equal(focus.statusExact, true);
+  hud.apply(post('Bash', 'shell', 'b1'));
+  focus = hud.snapshot().focus;
+  assert.equal(focus.status, 'working');
+  assert.equal(focus.statusSince, prompt.hookTs); // still the same turn
+  assert.equal(focus.statusExact, true);
+  const stop = ev('Stop');
+  hud.apply(stop);
+  hud.apply(ev('SubagentStop', { agentId: 'x' })); // no status change: the time stays
+  focus = hud.snapshot().focus;
+  assert.equal(focus.status, 'idle');
+  assert.equal(focus.statusSince, stop.hookTs);
+});
+
+test('status since is a lower bound when the server joined in the middle of a turn', () => {
+  const first = pre('Read', 'read', 'r1');
+  let { focus } = run([first]);
+  assert.equal(focus.status, 'working');
+  assert.equal(focus.statusSince, first.hookTs);
+  assert.equal(focus.statusExact, false);
+  const stop = ev('Stop');
+  ({ focus } = run([stop]));
+  assert.equal(focus.status, 'idle');
+  assert.equal(focus.statusExact, true); // a Stop starts the idle time itself
+});

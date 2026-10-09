@@ -122,6 +122,8 @@ test('tool kinds', () => {
   assert.equal(toolKind('PowerShell'), 'shell');
   assert.equal(toolKind('mcp__github__create_issue'), 'mcp');
   assert.equal(toolKind('Skill'), 'other');
+  assert.equal(toolKind('AskUserQuestion'), 'ask');
+  assert.equal(toolKind('ExitPlanMode'), 'ask');
 });
 
 test('TodoWrite sends task counts only, never the task text', () => {
@@ -138,4 +140,14 @@ test('TodoWrite sends task counts only, never the task text', () => {
   assert.equal(e.kind, 'task');
   assert.deepEqual(e.todos, { total: 3, done: 1, doing: 1 });
   assert.ok(!JSON.stringify(e).includes('secret'));
+});
+
+test('AskUserQuestion keeps only the first question\'s short header', () => {
+  const e = normalize({
+    hook_event_name: 'PreToolUse', session_id: 's', tool_name: 'AskUserQuestion', tool_use_id: 'q1',
+    tool_input: { questions: [{ question: 'Which framework should the new page use?', header: 'Framework', options: [{ label: 'React' }] }] },
+  }, meta);
+  assert.equal(e.kind, 'ask');
+  assert.equal(e.target, 'Framework');
+  assert.ok(!JSON.stringify(e).includes('Which framework'));
 });

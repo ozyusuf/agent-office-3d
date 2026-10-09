@@ -191,7 +191,7 @@ export function createSettings({ panel, button, status, translate, onChange }) {
 
 /** A button's data-value as the setting's type. */
 function parse(key, value) {
-  if (key === 'bloom') return value === 'true';
+  if (key === 'bloom' || key === 'statusFrame') return value === 'true';
   if (key === 'pixelRatioCap' || key === 'maxFps') return Number(value);
   if (key === 'contextWindow') return value === 'auto' ? 'auto' : Number(value);
   return value;

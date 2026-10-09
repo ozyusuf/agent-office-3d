@@ -4,6 +4,10 @@
 // lower bounds (`startExact` / `contextExact` = false) instead of being made up.
 
 const MAX_SESSIONS = 20;
+/** Tools that wait for the user's answer: what the agent waits for while one runs. */
+const ASKS = { AskUserQuestion: 'question', ExitPlanMode: 'plan' };
+/** Events that start a status at their own time, even as the first event the server sees. */
+const STARTS_STATUS = new Set(['SessionStart', 'UserPromptSubmit', 'PermissionRequest', 'Stop', 'StopFailure', 'SessionEnd']);
 
 /** Level curve from DESIGN.md: level = floor(sqrt(xp / 5)) + 1. */
 export function levelInfo(xp) {
@@ -28,6 +32,7 @@ export class HudState {
   apply(e) {
     const s = this.#session(e);
     const main = !e.agentId; // events from inside a subagent carry agent_id
+    const first = s.events++ === 0;
     let xpChanged = false;
 
     s.lastEventAt = e.hookTs;
@@ -63,6 +68,8 @@ export class HudState {
         s.turnEnded = false;
         s.error = null;
         s.turn = true;
+        s.turnStartedAt = e.hookTs;
+        s.turnExact = true;
         break;
 
       case 'PreToolUse': {
@@ -77,6 +84,7 @@ export class HudState {
           s.turn = true;
           s.turnEnded = false;
           s.compacting = null; // the main agent cannot run tools while its context is compacting
+          beginTurn(s, e);
         }
         break;
       }
@@ -102,7 +110,10 @@ export class HudState {
         // PermissionRequest has no tool_use_id: pair it with the latest running call of that tool.
         const paired = [...s.active].reverse().find(([, a]) => a.tool === e.tool);
         s.permission = { tool: e.tool, target: e.target, toolUseId: paired?.[0] ?? null };
-        if (main) s.turn = true;
+        if (main) {
+          s.turn = true;
+          beginTurn(s, e);
+        }
         break;
       }
 
@@ -146,6 +157,15 @@ export class HudState {
         s.endReason = e.reason ?? null;
         break;
     }
+
+    // When the current status began: "your turn for 4 min" on the HUD's status band.
+    const now = status(s);
+    if (now !== s.status) {
+      s.status = now;
+      s.statusSince = e.hookTs;
+      // The first event the server sees may fall in the middle of a status (it joined late).
+      s.statusExact = !first || STARTS_STATUS.has(e.event) || now === 'waiting';
+    }
     return xpChanged;
   }
 
@@ -183,6 +203,12 @@ export class HudState {
         error: null,
         helpers: new Map(), // agent_id -> subagent
         compacting: null,
+        events: 0, // events seen of this session
+        status: null, // status after the latest event, and when it began
+        statusSince: null,
+        statusExact: false,
+        turnStartedAt: null, // the current turn's prompt (or the first call seen of it)
+        turnExact: false,
       };
       this.sessions.set(id, s);
       this.#prune(id);
@@ -219,8 +245,16 @@ function resetContext(s) {
 // Ends the main agent's turn. `all` also drops running subagent calls (new prompt, interrupt, end).
 function endTurn(s, all) {
   s.turn = false;
+  s.turnStartedAt = null;
   s.permission = null;
   for (const [key, a] of s.active) if (all || !a.agentId) s.active.delete(key);
+}
+
+// A main-agent call in a turn whose prompt the server did not see: the turn ran at least since then.
+function beginTurn(s, e) {
+  if (s.turnStartedAt !== null) return;
+  s.turnStartedAt = e.hookTs;
+  s.turnExact = false;
 }
 
 function finishTool(s, e) {
@@ -238,10 +272,17 @@ function finishTool(s, e) {
   if (p && (p.toolUseId ? p.toolUseId === e.toolUseId : p.tool === e.tool)) s.permission = null;
 }
 
+/** What the agent waits for from the user: 'permission', 'question', 'plan', or null. */
+function waitFor(s) {
+  if (s.permission) return ASKS[s.permission.tool] ?? 'permission';
+  for (const a of s.active.values()) if (!a.agentId && ASKS[a.tool]) return ASKS[a.tool];
+  return null;
+}
+
 function status(s) {
   if (s.endedAt !== null) return 'ended';
   if (s.error) return 'error';
-  if (s.permission) return 'waiting';
+  if (waitFor(s)) return 'waiting';
   if (s.turn || s.active.size || s.compacting) return 'working';
   return 'idle';
 }
@@ -255,6 +296,12 @@ function view(s) {
     sessionId: s.id,
     project: s.project,
     status: status(s),
+    waitFor: waitFor(s),
+    // When the status began; while working, since the turn's prompt (a permission in between
+    // does not restart it). Exact = false when the server joined in the middle of it.
+    ...(status(s) === 'working' && s.turnStartedAt !== null
+      ? { statusSince: s.turnStartedAt, statusExact: s.turnExact }
+      : { statusSince: s.statusSince, statusExact: s.statusExact }),
     startedAt: s.startedAt,
     startExact: s.startExact,
     endedAt: s.endedAt,

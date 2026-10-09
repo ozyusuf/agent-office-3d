@@ -10,7 +10,8 @@ export function logEntry(e, t) {
     case 'UserPromptSubmit':
       return { tone: 'prompt', parts: t.parts('log.prompt') };
     case 'PreToolUse':
-      return { tone: 'tool', parts: t.parts(toolLogKey(e), { target: e.target, tool }) };
+      // A question or a plan to approve waits for the user: a yellow line, like a permission.
+      return { tone: e.kind === 'ask' ? 'warn' : 'tool', parts: t.parts(toolLogKey(e), { target: e.target, tool }) };
     case 'PostToolUse':
       return null; // the HUD shows it as a skill dimming; the log stays readable
     case 'PostToolUseFailure':
@@ -42,6 +43,8 @@ function toolLogKey(e) {
   if (e.tool === 'WebSearch') return 'log.webSearch';
   if (e.tool === 'WebFetch') return 'log.webFetch';
   if (e.tool === 'Write') return 'log.write';
+  if (e.tool === 'AskUserQuestion') return 'log.question';
+  if (e.tool === 'ExitPlanMode') return 'log.plan';
   const known = ['read', 'search', 'edit', 'shell', 'task', 'agent'];
   return known.includes(e.kind) ? `log.${e.kind}` : 'log.other';
 }
@@ -55,6 +58,8 @@ export function activityParts(focus, t) {
     case 'error':
       return t.parts('act.error', { error: t.word('error', focus.error?.error) });
     case 'waiting':
+      if (focus.waitFor === 'question') return t.parts('act.question', { target: focus.activity?.target });
+      if (focus.waitFor === 'plan') return t.parts('act.plan');
       return t.parts('act.waiting', { tool: focus.permission?.tool });
   }
   if (focus.compacting) return t.parts('act.compacting');
@@ -63,7 +68,8 @@ export function activityParts(focus, t) {
     const known = ['read', 'search', 'edit', 'shell', 'web', 'task', 'agent'];
     return t.parts(known.includes(a.kind) ? `act.${a.kind}` : 'act.other', { target: a.target, tool: a.tool });
   }
-  return t.parts(focus.status === 'working' ? 'act.thinking' : 'act.idle');
+  if (focus.status === 'working') return t.parts('act.thinking');
+  return t.parts(focus.turnEnded ? 'act.done' : 'act.idle');
 }
 
 /** 75 s -> "1m 15s", 2 h 5 min -> "2h 05m" (units translated). */
@@ -76,4 +82,34 @@ export function formatDuration(ms, t) {
   if (h > 0) return `${h}${t('unit.h')} ${pad(m)}${t('unit.m')}`;
   if (m > 0) return `${m}${t('unit.m')} ${pad(s)}${t('unit.s')}`;
   return `${s}${t('unit.s')}`;
+}
+
+/**
+ * The glance state (D68): what the agent is up to, told by a coloured window frame, a small bubble
+ * over the character's nameplate and the header chip. kind: 'work' (busy: no frame, no bubble),
+ * 'turn' (done or ready: the user's turn), 'wait' (a permission, question or plan needs the user
+ * now), 'error'. Null without a running session.
+ */
+export function glanceOf(focus, t) {
+  if (!focus || focus.status === 'ended') return null;
+  const at = (kind, key, mark, caption) => ({ kind, key, mark, word: t(`glance.${key}`), caption });
+  switch (focus.status) {
+    case 'working':
+      return at('work', 'working', null, activityParts(focus, t));
+    case 'idle':
+      return focus.turnEnded
+        ? at('turn', 'done', '✓', t.parts('glance.doneCap'))
+        : at('turn', 'ready', '✓', t.parts('glance.readyCap'));
+    case 'waiting': {
+      const key = focus.waitFor ?? 'permission';
+      const caption = key === 'permission'
+        ? t.parts('glance.permissionCap', { tool: focus.permission?.tool, target: focus.permission?.target })
+        : t.parts(`glance.${key}Cap`, { target: focus.activity?.target });
+      return at('wait', key, key === 'permission' ? '!' : '?', caption);
+    }
+    case 'error':
+      return at('error', 'error', '✕', t.parts('glance.errorCap', { error: t.word('error', focus.error?.error) }));
+    default:
+      return null;
+  }
 }

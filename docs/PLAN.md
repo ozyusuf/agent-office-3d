@@ -95,3 +95,17 @@ stop) plays out visibly on screen with correct stations and no stuck states.
 
 **Done when:** the scene's CPU use is clearly lower in every state on the same machine, with the same
 picture and no new console errors.
+
+## Stage 8 - Glance status (user request: see from afar whether Claude needs you)
+- [x] Verify in the hooks docs how a question / plan approval shows up (PreToolUse AskUserQuestion / ExitPlanMode)
+- [x] Server: `waitFor` (permission / question / plan), `statusSince` + `statusExact`
+- [x] Window frame (green / yellow / red), bubble over the nameplate (? ! ✓ ✕), header chip with since when, tab title (D68)
+- [x] First version's big status band removed after the user's feedback (too big)
+- [x] Log and nameplate say "has a question" / "plan to approve" / "done, your turn"
+- [x] Setting `statusFrame` (on / off)
+- [x] Screenshots of every state; hop checked; CPU same as 0.2.0 (the done bubble stays still)
+- [x] Plan limits researched: not available in the VS Code extension (D69)
+- [ ] Live check by the user: a real question, permission and finished turn seen on the tablet
+
+**Done when:** from across the room the user can tell working / needs you / done apart on the
+tablet, in a real session.

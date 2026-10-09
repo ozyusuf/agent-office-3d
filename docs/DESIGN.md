@@ -94,6 +94,12 @@ Must also work down to 420 px wide. Nothing scrolls; the log scrolls inside itse
   idle dim, waiting yellow blinking, error red, ended / none faint) and "· N tools" (finished tool
   calls of the session; hidden under 480 px), the connection dot (green, yellow connecting, red
   blinking when dropped), the gear (opens the settings panel).
+- **Glance** (D68): the window gets a 5 px inset frame: green when the turn is done or a session
+  waits for its first prompt, yellow while Claude needs the user (permission, question, plan),
+  red on an error, none while working (setting `statusFrame`). A small speech bubble sits on the
+  nameplate's top right: `?` question / plan and `!` permission (yellow, hops every 1.1 s, moved on
+  rendered frames), `✓` done (green, still), `✕` error (red, still). The header chip shows the
+  glance word and since when ("Done · 4m 05s"); the tab title starts with the word.
 - **Instruments** (under a hairline): three cells side by side, split by hairlines. Each = small caps
   label, value on the right, meter below. Before the first event only "waiting for events".
   1. Context - the real tokens in the main agent's context, read from the end of the session
@@ -246,6 +252,7 @@ Every reaction is caused by a real event. "Pair" = matched by `tool_use_id`.
 | PreToolUse | Bash, PowerShell | character types at the desk; Terminal rings spin up and brighten | Bash lights up on the skill rail; label "Running command" |
 | PreToolUse | WebSearch, WebFetch | character types at the desk; Orbit Sphere spins faster, rings brighten | Web lights up on the skill rail; label "Searching the web (host)" |
 | PreToolUse | TodoWrite, Task* tools | character to the Board; TodoWrite: ticker shows one chip per task (done green, in progress yellow, open outline; counts only) | label "Planning tasks" |
+| PreToolUse | AskUserQuestion, ExitPlanMode (main agent) | as PermissionRequest: desk light yellow, character waves | yellow `?` bubble hops, chip "Has a question" / "Plan to approve", yellow frame and vignette; the log shows the question's header chip only; state waiting until the pair PostToolUse(Failure) |
 | PreToolUse | anything else (MCP, Skill, ...) | character types at the desk; desk holograms pulse | log only |
 | PostToolUse | pair | station eases back to idle (~1 s); character stays 2.5 s, then returns to the desk | context +1, total +1 (XP); skill dims |
 | PostToolUseFailure | pair (fires instead of PostToolUse when a tool errors or is interrupted) | station sputters: drops dark at once, red flicker (~1 s); a main-agent failure makes the character flinch (shoulders up, a shake of the head) | context +1, total +1 (the call still used context); skill dims; log "Tool failed: error" or "Interrupted" |
@@ -254,7 +261,7 @@ Every reaction is caused by a real event. "Pair" = matched by `tool_use_id`.
 | SubagentStop | same `agent_id` | helper flies back over the portal and sinks into it; its unfinished calls end | log "Helper returned" |
 | PreCompact | `trigger` | rack strips flash, LEDs drain top to bottom (1.5 s) | log "Compacting context (auto/manual)" |
 | PostCompact | - | racks stay empty | context bar -> 0 |
-| Stop | - | character walks to the arcade and plays; arcade screen lights up; the scene lowers its lights a little; a shooting star crosses the sky if the stars are out | state idle; log "Turn finished" |
+| Stop | - | character walks to the arcade and plays; arcade screen lights up; the scene lowers its lights a little; a shooting star crosses the sky if the stars are out | state idle; green frame, `✓` bubble, chip "Done · time", nameplate "Done, your turn"; log "Turn finished" |
 | (derived) | XP crosses a level | gold sparks burst out of the character, a gold ring runs over the dais, the character cheers | "Level up · LV n" banner, badge pulses |
 | (derived) | transcript usage (main thread) | rack LEDs lit = tokens / window x 144 | context meter in tokens |
 | StopFailure | `error` (e.g. rate_limit) | lights go down, red alert pulse on every platform rim; a storm over the realm: darker clouds and sky, rain, soft lightning now and then; character slumps at the desk | red vignette; state error (red); label shows error type; cleared by next UserPromptSubmit/SessionStart |

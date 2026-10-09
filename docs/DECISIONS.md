@@ -443,3 +443,37 @@ Result (same machine, i7-11800H + Intel UHD, 600x1000, default settings, % of on
 GPU process): standby 69 -> 24, idle after a turn 78 -> 48, idle after a quiet minute 78 -> 37,
 busy session (a tool call every 1.5 s, many walks) 158 -> 117. Not done: merging station meshes
 (their parts move and light up one by one), lower calm rates (strolls and rain look choppy at 15).
+
+**D68. The scene tells at a glance whether the agent needs the user: a window frame, a bubble
+over the character, a header chip (stage 8, user request, 2026-10-09).** The user leaves the room
+after a prompt, with the monitor on a tablet used as a wireless second screen, and wants to see from
+afar: working, asking something, or done and waiting. A first version had a big status band with a
+36-44 px word under the header; the user found the text too big and asked for the character to show
+it instead, but liked the green frame. Now:
+- *Window frame* (5 px, inset, setting `statusFrame`, default on): green = done or ready (the
+  user's turn), yellow = needs the user now (with the yellow vignette's blink), red = error, none
+  while working. Seen from the corner of the eye.
+- *Bubble* on the nameplate's top right: `?` a question or a plan to approve, `!` a permission
+  (both yellow and hopping every 1.1 s), `✓` done / ready (green), `✕` error (red), none while
+  working. The hop is moved on rendered 3D frames, not by a CSS animation (D67); done and error
+  stay still, since they can last for hours and a moving bubble is repainted every frame (~6 % CPU).
+- *Header chip* and tab title: the glance word and since when ("Done · 4m 05s", "≥" when the
+  server joined in the middle of it); the nameplate says "Done, your turn".
+- *What counts as waiting*: PermissionRequest, or a running AskUserQuestion / ExitPlanMode of the
+  main agent (hooks docs: both "require user interaction" and run until the user answers, so
+  PreToolUse starts the wait and PostToolUse / PostToolUseFailure ends it). No new hook event:
+  installed users do not run the installer again. Only the first question's short header leaves
+  the server. A question asked in plain text ends with Stop, so it shows as Done (the user's turn).
+The server tracks `waitFor` and `statusSince` / `statusExact`; `glanceOf()` in narrate.js maps the
+focus session to kind, word, caption and bubble mark.
+
+**D69. Plan limits (5-hour / weekly usage) are not shown (checked 2026-10-09).** The user asked
+whether the monitor could track them. The only official source is the status line's JSON
+(`rate_limits.five_hour` / `seven_day`: `used_percentage`, `resets_at`; claude.ai Pro/Max only,
+after the first response). Hooks carry no usage numbers (only StopFailure `rate_limit` when a limit
+is hit, already shown as the storm). A probe `statusLine` in `.claude/settings.local.json` never ran
+in the VS Code extension over several turns, so the data does not reach the extension the user
+works in; the extension shows usage only in its `/usage` dialog. Reading the account's usage from
+Anthropic's servers with the stored login would be an unofficial call with the user's credentials
+and is ruled out (privacy, no outside calls). Possible later: forward `rate_limits` from a status
+line for users of the terminal CLI.

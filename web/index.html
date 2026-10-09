@@ -18,6 +18,8 @@
   <div id="tint" class="tint" aria-hidden="true"></div>
   <div class="labels" id="labels">
     <div class="char-label" id="char-label" data-anchor="character" data-slot="0.5,0.26">
+      <!-- Speech bubble (D68): ? a question or plan, ! a permission (both hop), ✓ done, ✕ error. -->
+      <span class="bubble" id="bubble" hidden aria-hidden="true"></span>
       <div class="lvl" id="lvl-badge"><span class="lvl-k" data-i18n="lvl"></span><span class="lvl-n" id="lvl">–</span></div>
       <div class="char-info">
         <div class="char-line" id="char-line"></div>
@@ -121,6 +123,17 @@
           <p class="popover-fps" id="fps"></p>
 
           <section class="set-group">
+            <div class="popover-row">
+              <span data-i18n="statusFrame"></span>
+              <span class="seg-buttons">
+                <button type="button" data-key="statusFrame" data-value="true" data-i18n="on"></button>
+                <button type="button" data-key="statusFrame" data-value="false" data-i18n="off"></button>
+              </span>
+            </div>
+            <p class="popover-hint" data-i18n="set.statusFrameNote"></p>
+          </section>
+
+          <section class="set-group">
             <h3 class="set-head" data-i18n="set.bars"></h3>
             <div class="popover-row">
               <span data-i18n="set.contextWindow"></span>
@@ -178,6 +191,9 @@
       <span class="skill" data-skill="permission"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.6 2H4.4z"/><path d="M10 21a2.2 2.2 0 0 0 4 0"/></svg><span class="name"></span><span class="tag"></span></span>
     </footer>
   </div>
+
+  <!-- Window frame (D68): green = the user's turn, yellow = Claude needs the user, red = error. -->
+  <div class="frame" id="frame" aria-hidden="true"></div>
 
   <script type="module" src="app.js"></script>
 </body>
