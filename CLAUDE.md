@@ -34,7 +34,7 @@ Claude Code hooks -> local server (127.0.0.1 only) -> WebSocket -> three.js page
 - Stack: Node.js, `ws`, three.js (ES modules). No frameworks, no bundler.
 - Never show made-up data. Every number and bar on screen must come from a real hook event.
 - Server binds to 127.0.0.1 only and checks Host/Origin headers.
-- Visual work: follow `docs/DESIGN.md` (source of truth); `docs/design/reference.png` = station placement only.
+- Visual work: follow `docs/DESIGN.md` (source of truth for the look and the station placement).
 - Performance: cap pixel ratio, stop rendering when the tab is hidden, bloom can be turned off.
 
 ## Working with the user

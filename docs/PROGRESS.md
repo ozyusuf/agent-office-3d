@@ -36,14 +36,13 @@
 (stage 6 "done when") not tried; no GIF, only 3 states pictured (D62).
 
 **Known issues / open questions**
-- `docs/design/reference.png` (the original target image) shows a personal name ("Şimşek") and VS
-  Code's UI; its origin/licence is not recorded. Asked the user whether to keep it public.
+- The original reference image was removed from the repo and its whole git history (user, D65).
 - While the character types at the editor its nameplate covers the floating `</>` sign (the front
   emblem stays visible). At the duck stand it briefly hides part of the monitor.
 - fps still only measured in headless Edge (35-55).
 
 **Next step:** `/next` -> finish stage 6: install from a fresh clone following only the README
-(another folder or machine), check the shortcuts, decide on reference.png.
+(another folder or machine), check the shortcuts.
 
 ### 2026-10-09 - Session 5 - Stage 5 (settings) + redesign
 **Done**
@@ -197,7 +196,7 @@ orthographic isometric camera, then platforms and stations from primitives.
 
 ### 2026-10-09 - Session 1 - Stage 0 (docs) + Stage 1 (hook -> server -> list)
 **Done**
-- Saved the target image to `docs/design/reference.png`.
+- Saved the target image to the repo (removed later from the repo and its history, D65).
 - Wrote CLAUDE.md, PLAN, DESIGN (palette measured from the image), DECISIONS, PROGRESS,
   `/next` and `/wrap` commands, `.gitignore`; `git init -b main`; `npm i ws`.
 - Verified hook names, input fields and the PowerShell exec-form settings against

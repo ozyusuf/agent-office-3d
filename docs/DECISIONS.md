@@ -254,8 +254,8 @@ server is away the draft stays on screen and is sent again after the reconnect. 
 
 **D49. The look is redesigned freely; the reference image now gives only the content and placement.**
 The user found the stage 2-5 look generic ("a bit like AI slop") and asked for a design of my own.
-`docs/DESIGN.md` is the source of truth for the look; `docs/design/reference.png` still describes
-which stations exist and where they stand. Replaces "match the reference layout" for the HUD (D22).
+`docs/DESIGN.md` is the source of truth for the look; the reference image still described which
+stations exist and where they stand (until D65). Replaces "match the reference layout" for the HUD (D22).
 
 **D50. Light is information.** Station neon rests dim, below the bloom threshold (`REST` 0.3 or
 less, `lamp()` / `brighten()` in kit.js), and lights up while the station works; platform rims are
@@ -397,3 +397,8 @@ new prompt (fists up, a little jump), a failed main-agent call (flinch), a level
 glances at a busy station it does not walk to (Terminal, orbit sphere, portal, racks). Strolls and
 fidgets carry no data and say nothing the HUD does not; the spot, the station lights and the
 reactions still come only from events. Reduced motion turns strolls, fidgets and reactions off.
+
+**D65. The reference image is removed from the repo and its history (user, 2026-10-09).** It showed
+a personal name and a third-party UI, and its origin was not recorded, so it should not be public.
+`docs/DESIGN.md` (section 4) already holds every station and its place, so nothing depends on it.
+The history was rewritten and force-pushed once, with the user's explicit request.

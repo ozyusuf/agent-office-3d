@@ -1,8 +1,7 @@
 # Design
 
-This file is the source of truth for the look (D49). `docs/design/reference.png` (right half,
-x >= 516 px) still shows which stations exist and where they stand; the look itself was redesigned
-after stage 5 and no longer follows the image.
+This file is the source of truth for the look (D49) and for which stations exist and where they
+stand (section 4). The original reference image is no longer in the repo (D65).
 
 ## 1. Mood and principles
 A small workshop floating above a sea of clouds, seen from above like a model: matte dark metal

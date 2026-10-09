@@ -1,6 +1,6 @@
 // The realm's structure: floating platforms, pipes, cables and lights (the sky is sky.js).
 // World axes: +x runs to the lower right of the screen, +z to the lower left, y is up.
-// Layout follows docs/DESIGN.md section 4 (positions as seen in docs/design/reference.png).
+// Layout follows docs/DESIGN.md section 4 (station placement from the original reference image).
 
 import * as THREE from 'three';
 import { P, MAT, rng, neon, platform, chamferOutline, pipeGeometries, merged, setGlow } from './kit.js';

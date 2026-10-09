@@ -6,7 +6,7 @@ Start the next stage of agent-office-3d.
 
 1. Read `docs/PROGRESS.md` and `docs/PLAN.md`. Find the first stage that still has unchecked boxes.
 2. If the stage involves anything visual (HUD, palette, 3D scene, animations), also read
-   `docs/DESIGN.md` and look at `docs/design/reference.png`.
+   `docs/DESIGN.md`.
 3. Read `docs/DECISIONS.md` if you are about to make a choice that may already be decided.
 4. Tell the user, in Turkish, in exactly two sentences, which stage is next and what you will build.
 5. Start working on that stage right away. Follow every rule in `CLAUDE.md`
