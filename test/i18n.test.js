@@ -86,7 +86,7 @@ test('durations', () => {
 
 test('active stations', () => {
   const base = { status: 'working', activeKinds: [], helpers: [], compacting: null };
-  assert.deepEqual([...activeStations({ ...base, activeKinds: ['edit', 'read'] })].sort(), ['board', 'smelter']);
+  assert.deepEqual([...activeStations({ ...base, activeKinds: ['edit', 'read'] })].sort(), ['board', 'editor']);
   assert.deepEqual([...activeStations({ ...base, activeKinds: ['mcp'] })], ['desk']);
   assert.deepEqual([...activeStations({ ...base, status: 'idle', turnEnded: true })], ['arcade']);
   assert.deepEqual([...activeStations({ ...base, status: 'idle', turnEnded: false })], []); // fresh session

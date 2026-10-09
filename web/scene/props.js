@@ -34,7 +34,7 @@ export function buildProps(scene, camera, drive) {
   const billboard = camera.quaternion.clone();
 
   add('desk', commandDesk(drive));
-  add('smelter', smelter(billboard, drive));
+  add('editor', codeEditor(billboard, drive));
   add('board', visionBoard(drive));
   add('centrifuge', centrifuge(drive));
   add('orbit', orbitSphere(drive));
@@ -227,127 +227,387 @@ function fixRingUv(geo, outer) {
   for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / (2 * outer) + 0.5, pos.getY(i) / (2 * outer) + 0.5);
 }
 
-// ---- Code Smelter: furnace with fire core, flames and sparks ----
+// ---- Code Editor: a workbench with a monitor (an editor that writes line by line), a floating
+// </> sign and a rubber duck ----
 
-function smelter(billboard, drive) {
+/** Where the bench stands; turned a little towards the desk, so the character works at it half side-on (walk.js). */
+const EDITOR_POS = v3(-2.55, 0, 2.95);
+const EDITOR_YAW = FACE_CAMERA + 0.35;
+
+function codeEditor(billboard, drive) {
   const group = new THREE.Group();
-  group.position.set(-2.55, 0, 2.95);
-  group.rotation.y = FACE_CAMERA;
+  group.position.copy(EDITOR_POS);
+  group.rotation.y = EDITOR_YAW;
 
-  const w = 1.6;
-  const h = 0.95;
-  const d = 1.3;
-  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), MAT.hull);
-  body.position.y = h / 2;
-  group.add(body);
-  const trims = [];
-  for (const [sx, sz, lx, lz] of [[0, d / 2, w + 0.1, 0.1], [0, -d / 2, w + 0.1, 0.1], [w / 2, 0, 0.1, d], [-w / 2, 0, 0.1, d]]) {
-    const t = new THREE.BoxGeometry(lx, 0.12, lz);
-    t.translate(sx, h + 0.05, sz);
-    trims.push(t);
+  // Workbench: a top on two side panels, a lamp strip along the front edge.
+  const W = 2.1;
+  const D = 0.8;
+  const TOP = 1.0;
+  const top = new THREE.Mesh(new THREE.BoxGeometry(W, 0.09, D), MAT.hull);
+  top.position.y = TOP - 0.045;
+  group.add(top);
+  const frame = [];
+  for (const s of [-1, 1]) {
+    const side = new THREE.BoxGeometry(0.1, TOP - 0.09, D - 0.12);
+    side.translate(s * (W / 2 - 0.14), (TOP - 0.09) / 2, 0);
+    frame.push(side);
+    const foot = new THREE.BoxGeometry(0.22, 0.06, D);
+    foot.translate(s * (W / 2 - 0.14), 0.03, 0);
+    frame.push(foot);
   }
-  const foot = new THREE.BoxGeometry(w + 0.16, 0.12, d + 0.16);
-  foot.translate(0, 0.06, 0);
-  trims.push(foot);
-  group.add(merged(trims, MAT.trim));
+  const front = new THREE.BoxGeometry(W - 0.38, TOP - 0.42, 0.05);
+  front.translate(0, TOP - 0.09 - (TOP - 0.42) / 2, D / 2 - 0.08);
+  frame.push(front);
+  group.add(merged(frame, MAT.hullDark));
+  // The </> emblem on the front panel, left of where the character stands (always in view).
+  const badgeLamp = lamp(P.fireOrange, 2.4);
+  const badge = codeSign(badgeLamp);
+  badge.scale.set(0.62, 0.62, 0.4);
+  badge.position.set(-0.42, TOP - 0.36, D / 2 - 0.03);
+  group.add(badge);
+  const edge = lamp(P.fireOrange, 2.4);
+  const strip = new THREE.Mesh(new THREE.BoxGeometry(W - 0.06, 0.026, 0.02), edge);
+  strip.position.set(0, TOP - 0.05, D / 2 + 0.006);
+  group.add(strip);
 
-  // Glowing bed inside the top opening, and a hot window on the front.
-  const bed = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.2, d - 0.2), neon(P.fireDeep, 1.5, { own: true }));
-  bed.rotation.x = -Math.PI / 2;
-  bed.position.y = h + 0.005;
-  group.add(bed);
-  const hatch = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.2), neon(P.fireOrange, 2.0, { own: true }));
-  hatch.position.set(-0.15, 0.5, d / 2 + 0.006);
-  group.add(hatch);
-  const slits = [];
-  for (let i = 0; i < 4; i++) {
-    const s = new THREE.BoxGeometry(0.07, 0.34, 0.01);
-    s.translate(-w / 2 + 0.2 + i * 0.13, 0.4, d / 2 + 0.006);
-    slits.push(s);
-  }
-  group.add(merged(slits, solid(0x07080f, { roughness: 0.9, metalness: 0.2 })));
-  const panel = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.32, 0.1), MAT.hullDark);
-  panel.position.set(0.55, 0.48, d / 2 + 0.04);
-  group.add(panel);
-  const panelGlow = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.2), neon(P.warnYellow, 1.0));
-  panelGlow.position.set(0.55, 0.48, d / 2 + 0.092);
-  group.add(panelGlow);
+  // Monitor on a stand at the back of the bench, left of the keyboard (so the character, who
+  // types at the right end, does not hide it).
+  const MX = -0.2;
+  const MW = 2.0;
+  const MH = 1.16;
+  const MY = TOP + 0.5 + MH / 2;
+  const MZ = -0.2;
+  const stand = [];
+  const post = new THREE.CylinderGeometry(0.05, 0.06, 0.56, 10);
+  post.translate(MX, TOP + 0.28, MZ - 0.06);
+  stand.push(post);
+  const plate = new THREE.BoxGeometry(0.56, 0.035, 0.3);
+  plate.translate(MX, TOP + 0.018, MZ - 0.02);
+  stand.push(plate);
+  group.add(merged(stand, MAT.trim));
+  const monitor = new THREE.Group();
+  monitor.position.set(MX, MY, MZ);
+  monitor.rotation.x = -0.08;
+  group.add(monitor);
+  const housing = new THREE.Mesh(new THREE.BoxGeometry(MW + 0.1, MH + 0.1, 0.08), MAT.hullDark);
+  housing.position.z = -0.045;
+  monitor.add(housing);
+  const screen = editorScreen();
+  const display = new THREE.Mesh(new THREE.PlaneGeometry(MW, MH), new THREE.MeshBasicMaterial({ map: screen.texture }));
+  monitor.add(display);
+  const chin = lamp(P.fireOrange, 2.2);
+  const led = new THREE.Mesh(new THREE.BoxGeometry(MW * 0.5, 0.022, 0.02), chin);
+  led.position.set(0, -MH / 2 - 0.035, 0.002);
+  monitor.add(led);
 
-  // Side pipes (left side, like the reference).
-  const pipes = [];
-  for (let i = 0; i < 3; i++) {
-    const z = -0.38 + i * 0.36;
-    pipes.push(...pipeGeometries([[-w / 2 - 0.15, 0.06, z], [-w / 2 - 0.15, 0.8, z], [-w / 2 + 0.05, 0.8, z]], 0.075, { bend: 0.14 }));
-  }
-  group.add(merged(pipes, MAT.pipe));
+  // Keyboard at the right end, turned a little towards the character.
+  const keyboard = new THREE.Group();
+  keyboard.position.set(0.5, TOP, 0.12);
+  keyboard.rotation.y = 0.14;
+  group.add(keyboard);
+  const keyCase = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.045, 0.26), MAT.trim);
+  keyCase.position.y = 0.022;
+  keyboard.add(keyCase);
+  const keys = new THREE.Mesh(new THREE.PlaneGeometry(0.68, 0.2), new THREE.MeshBasicMaterial({
+    map: keysTexture(), color: new THREE.Color(P.fireOrange).multiplyScalar(0.3), transparent: true, depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  }));
+  keys.rotation.x = -Math.PI / 2;
+  keys.position.y = 0.047;
+  keyboard.add(keys);
 
-  // Fire: billboard flames rising from the bed, plus sparks.
-  const flames = particles(16, TEX.flame, billboard);
-  const sparks = particles(26, TEX.glow, billboard);
-  group.add(flames.mesh, sparks.mesh);
-  const halo = glowSprite(P.fireOrange, 3.4, 0.3);
-  halo.position.y = h + 0.6;
-  group.add(halo);
+  // The rubber duck at the other end, looking at the character (rubber duck debugging).
+  const duck = rubberDuck();
+  duck.position.set(-0.78, TOP, 0.12);
+  duck.rotation.y = 1.0;
+  group.add(duck);
 
-  const rand = rng(3);
-  const fl = flames.items.map(() => ({ age: rand(), life: 0.7 + rand() * 0.5, x: 0, z: 0, s: 1 }));
-  const sp = sparks.items.map(() => ({ age: rand(), life: 0.8 + rand() * 0.9, p: v3(0, -9, 0), v: v3(0, 0, 0) }));
-  const hot = new THREE.Color();
-  const ember = new THREE.Color(P.fireDeep);
-  const tmp = new THREE.Vector3();
+  // The </> sign floating over the monitor.
+  const signY = MY + MH / 2 + 0.62;
+  const sign = new THREE.Group();
+  sign.position.set(MX, signY, MZ);
+  group.add(sign);
+  const signLamp = lamp(P.fireOrange, 2.8);
+  sign.add(codeSign(signLamp));
+  const signHalo = glowSprite(P.fireOrange, 2.4, 0.05);
+  sign.add(signHalo);
+
+  // Code bits ({ }, ( ), ;) float up off the screen while the agent writes.
+  const bits = ['{ }', '( )', ';'].map((text) => particles(4, glyphTexture(text), billboard));
+  for (const b of bits) group.add(b.mesh);
+  const rand = rng(5);
+  const flying = bits.flatMap((b, kind) => b.items.map((_, i) => ({ kind, i, age: 1, life: 1, p: v3(0, 0, 0), v: v3(0, 0, 0), s: 1 })));
+  const tint = new THREE.Color();
+  let spawn = 0;
 
   return {
     group,
-    anchor: localPoint(group, 0, 2.5, 0),
-    core: localPoint(group, 0, 1.3, 0),
-    hover: localPoint(group, 0.3, 4.3, -0.4), // above the station label
+    anchor: localPoint(group, MX, signY + 0.6, MZ),
+    core: localPoint(group, MX, MY, MZ + 0.2),
+    hover: localPoint(group, MX + 0.4, signY + 1.6, MZ - 0.3), // above the station label
     tick(t, dt) {
-      // Idle: a low fire. Edit / Write: the flames grow, sparks fly, the furnace glows.
-      const heat = 0.25 + 0.75 * drive.act.smelter;
-      fl.forEach((f, i) => {
-        f.age += dt / f.life;
-        if (f.age >= 1) {
-          f.age -= 1;
-          f.x = (rand() - 0.5) * (w - 0.55);
-          f.z = (rand() - 0.5) * (d - 0.55);
-          f.s = 0.7 + rand() * 0.6;
+      // Edit / Write / NotebookEdit: the editor writes, the sign and the lamps light up.
+      const a = drive.act.editor;
+      brighten([edge, chin], a, 0.25);
+      brighten([signLamp, badgeLamp], a, 0.32);
+      signHalo.material.opacity = 0.04 + 0.3 * a;
+      sign.position.y = signY + Math.sin(t * 1.3) * 0.06;
+      sign.rotation.y = Math.sin(t * 0.55) * (0.22 + 0.2 * a);
+      display.material.color.setScalar(0.55 + 0.7 * a);
+      setGlow(keys.material, P.fireOrange, 0.3 + a * (0.6 + 0.4 * Math.abs(Math.sin(t * 21))));
+      screen.step(t, dt, a);
+
+      spawn += dt * a * 5; // about five bits a second while busy
+      for (const f of flying) {
+        const b = bits[f.kind];
+        if (f.age >= 1 && spawn >= 1) {
+          spawn -= 1;
+          f.age = 0;
+          f.life = 1.3 + rand() * 0.8;
+          f.s = 0.2 + rand() * 0.12;
+          f.p.set(MX + (rand() - 0.5) * (MW - 0.4), MY + (rand() - 0.3) * MH * 0.6, MZ + 0.05);
+          f.v.set((rand() - 0.5) * 0.3, 0.55 + rand() * 0.4, 0.35 + rand() * 0.25);
         }
-        const k = f.age;
-        const size = f.s * Math.sin(Math.PI * Math.min(1, k * 1.3)) * (1 - k * 0.4) * (0.55 + 0.6 * heat);
-        tmp.set(f.x * (1 - k * 0.5), h + 0.22 + k * (0.45 + 0.9 * heat), f.z * (1 - k * 0.5));
-        hot.setHex(k < 0.3 ? P.warnYellow : P.fireOrange).lerp(ember, Math.max(0, k - 0.35)).multiplyScalar(0.95);
-        flames.set(i, tmp, size * 0.6, size * 1.1, hot);
-      });
-      sp.forEach((s, i) => {
-        s.age += dt / s.life;
-        if (s.age >= 1) {
-          s.age = 0;
-          // A low fire throws only a few sparks.
-          if (rand() < heat * heat) {
-            s.p.set((rand() - 0.5) * 0.8, h + 0.35, (rand() - 0.5) * 0.6);
-            s.v.set((rand() - 0.5) * 1.8, 1.6 + rand() * 1.6, (rand() - 0.5) * 1.8);
-          } else {
-            s.p.set(0, -9, 0);
-            s.v.set(0, 0, 0);
-          }
+        if (f.age < 1) {
+          f.age += dt / f.life;
+          f.p.addScaledVector(f.v, dt);
         }
-        s.v.y -= dt * 2.4;
-        s.p.addScaledVector(s.v, dt);
-        const size = s.p.y < 0 ? 0 : 0.08 * (1 - s.age);
-        hot.setHex(P.warnYellow).multiplyScalar(3 * (1 - s.age));
-        sparks.set(i, s.p, size, size, hot);
-      });
-      flames.commit();
-      sparks.commit();
-      halo.material.opacity = 0.1 + 0.24 * heat + 0.05 * Math.sin(t * 9) + 0.03 * Math.sin(t * 23);
-      halo.scale.setScalar(2.4 + 1.6 * heat);
-      setGlow(bed.material, P.fireDeep, 0.7 + 1.1 * heat);
-      setGlow(hatch.material, P.fireOrange, 0.9 + 1.5 * heat);
+        const fade = f.age < 1 ? Math.sin(Math.PI * Math.min(1, f.age * 1.6)) * (1 - f.age) : 0;
+        tint.setHex(f.kind === 2 ? P.text : P.fireOrange).multiplyScalar(1.6 * fade);
+        b.set(f.i, f.p, f.s * fade, f.s * fade, tint);
+      }
+      spawn = Math.min(spawn, 1);
+      for (const b of bits) b.commit();
     },
   };
 }
 
-/** Camera-facing quads in one InstancedMesh (fire, sparks). */
+/** The </> sign: five rounded strokes. */
+function codeSign(material) {
+  const strokes = [
+    [[-0.34, 0.28], [-0.62, 0]], [[-0.62, 0], [-0.34, -0.28]],
+    [[0.12, 0.34], [-0.12, -0.34]],
+    [[0.34, 0.28], [0.62, 0]], [[0.62, 0], [0.34, -0.28]],
+  ];
+  return merged(strokes.map(([[ax, ay], [bx, by]]) => {
+    const geo = new THREE.CapsuleGeometry(0.055, Math.hypot(bx - ax, by - ay), 4, 8);
+    geo.rotateZ(Math.atan2(by - ay, bx - ax) - Math.PI / 2);
+    geo.translate((ax + bx) / 2, (ay + by) / 2, 0);
+    return geo;
+  }), material);
+}
+
+/** A rubber duck (its beak points along +z). */
+function rubberDuck() {
+  const duck = new THREE.Group();
+  duck.scale.setScalar(1.5);
+  // One mesh per material: body + tail + head, the beak, the eyes.
+  const body = new THREE.SphereGeometry(0.15, 16, 12);
+  body.scale(1, 0.75, 1.25);
+  body.translate(0, 0.11, 0);
+  const tail = new THREE.ConeGeometry(0.06, 0.12, 10);
+  tail.rotateX(-2.2);
+  tail.translate(0, 0.18, -0.17);
+  const head = new THREE.SphereGeometry(0.095, 16, 12);
+  head.translate(0, 0.27, 0.08);
+  duck.add(merged([body, tail, head], solid(0xe8bc3c, { roughness: 0.45, metalness: 0, env: 0.3, emissive: 0x3a2a08, emissiveIntensity: 0.5 })));
+  const beak = new THREE.SphereGeometry(0.05, 12, 8);
+  beak.scale(1, 0.45, 1.1);
+  beak.translate(0, 0.255, 0.18);
+  duck.add(new THREE.Mesh(beak, solid(0xf08a3a, { roughness: 0.5, metalness: 0, emissive: 0x6a2a08 })));
+  const eyes = [-1, 1].map((s) => new THREE.SphereGeometry(0.016, 8, 6).translate(s * 0.05, 0.3, 0.155));
+  duck.add(merged(eyes, solid(0x10121a, { roughness: 0.3, metalness: 0.2 })));
+  return duck;
+}
+
+/** White glyph on a transparent square (code bits). */
+function glyphTexture(text) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  const g = canvas.getContext('2d');
+  g.fillStyle = '#ffffff';
+  g.font = '700 40px Consolas, "Cascadia Mono", monospace';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(text, 32, 34);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
+ * The monitor's picture: an editor window (title bar, tabs, gutter, minimap) whose code is
+ * coloured bars, no text. While the agent edits, lines are written one by one at a cursor, new
+ * lines push the rest down and get a change mark in the gutter. Redrawn only when it changes.
+ */
+function editorScreen() {
+  const W = 400;
+  const H = 232;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const g = canvas.getContext('2d');
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+
+  const LINE = 17;
+  const FIRST = 38; // y of the first line's centre
+  const ROWS = 11;
+  const CODE_X = 56;
+  const CODE_END = 352;
+  const rand = rng(41);
+  // Token colours (syntax): keyword, function (accent), string, plain, number, comment.
+  const SYNTAX = ['#c792ea', null, '#a5d6a7', '#d9d4c7', '#f0b27a', '#5f6878'];
+  const colour = (i) => SYNTAX[i] ?? liveCss(P.neonCyanSoft);
+
+  let indent = 0;
+  function makeLine() {
+    indent = Math.max(0, Math.min(3, indent + [-1, 0, 0, 1][Math.floor(rand() * 4)]));
+    if (rand() < 0.12) return { indent, tokens: [], mark: false };
+    if (rand() < 0.1) return { indent, tokens: [{ len: 60 + rand() * 120, c: 5 }], mark: false };
+    const tokens = [];
+    const n = 1 + Math.floor(rand() * 4);
+    for (let i = 0; i < n; i++) tokens.push({ len: 12 + rand() * 46, c: i === 0 && rand() < 0.6 ? 0 : 1 + Math.floor(rand() * 4) });
+    return { indent, tokens, mark: false };
+  }
+  const width = (line) => line.tokens.reduce((sum, tok) => sum + tok.len + 7, 0);
+  const lines = Array.from({ length: ROWS }, makeLine);
+  let cur = 5; // row of the line being written
+  let typed = 0; // px written on it
+  let target = null; // the line being written
+  let dirty = true;
+  let lastDraw = -1;
+  let blinkOn = true;
+  let tint = null;
+
+  function newLine() {
+    // A new line under the cursor pushes the rest down; near the bottom the view scrolls.
+    target = makeLine();
+    target.mark = true;
+    target.full = target.tokens;
+    target.tokens = [];
+    cur = Math.min(cur + 1, ROWS - 1);
+    lines.splice(cur, 0, target);
+    lines.length = ROWS;
+    if (cur >= ROWS - 3) {
+      lines.shift();
+      lines.push(makeLine());
+      cur--;
+    }
+    typed = 0;
+  }
+
+  function draw(cursorOn) {
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = '#0d0f19';
+    g.fillRect(0, 0, W, H);
+    // title bar, window buttons, tabs
+    g.fillStyle = '#1a1d2b';
+    g.fillRect(0, 0, W, 22);
+    for (const [x, c] of [[12, '#ff5f57'], [27, '#febc2e'], [42, '#28c840']]) {
+      g.fillStyle = c;
+      g.beginPath();
+      g.arc(x, 11, 4.5, 0, TAU);
+      g.fill();
+    }
+    g.fillStyle = '#0d0f19';
+    g.fillRect(60, 4, 96, 18);
+    g.fillStyle = '#f1ad56';
+    g.fillRect(60, 4, 96, 2);
+    g.fillStyle = 'rgba(217,212,199,0.8)';
+    g.fillRect(72, 11, 58, 5);
+    g.fillStyle = 'rgba(217,212,199,0.3)';
+    g.fillRect(170, 11, 46, 5);
+    g.fillRect(232, 11, 38, 5);
+    // activity bar and gutter
+    g.fillStyle = '#141725';
+    g.fillRect(0, 22, 18, H - 34);
+    for (let i = 0; i < 4; i++) {
+      g.fillStyle = i === 0 ? 'rgba(217,212,199,0.75)' : 'rgba(217,212,199,0.25)';
+      g.fillRect(5, 32 + i * 20, 8, 8);
+    }
+    // current line
+    const yCur = FIRST + cur * LINE;
+    g.fillStyle = 'rgba(241,173,86,0.13)';
+    g.fillRect(20, yCur - LINE / 2, CODE_END - 20, LINE);
+    lines.forEach((line, row) => {
+      const y = FIRST + row * LINE;
+      // line number (a dim tick, no digits), change mark
+      g.fillStyle = row === cur ? 'rgba(217,212,199,0.8)' : 'rgba(120,128,150,0.5)';
+      g.fillRect(34 - (row % 3 === 0 ? 10 : 6), y - 2, row % 3 === 0 ? 10 : 6, 4);
+      if (line.mark) {
+        g.fillStyle = '#f1ad56';
+        g.fillRect(42, y - LINE / 2 + 1, 4, LINE - 2);
+      }
+      let x = CODE_X + line.indent * 16;
+      for (const tok of line.tokens) {
+        const len = Math.min(tok.len, CODE_END - x);
+        if (len <= 0) break;
+        g.fillStyle = colour(tok.c);
+        g.fillRect(x, y - 3, len, 6);
+        x += tok.len + 7;
+      }
+      if (row === cur && cursorOn) {
+        g.fillStyle = '#ffcf8a';
+        g.fillRect(Math.min(x, CODE_END), y - 7, 3, 14);
+      }
+    });
+    // minimap with the visible part
+    g.fillStyle = '#11131f';
+    g.fillRect(360, 22, W - 360, H - 34);
+    for (let i = 0; i < 40; i++) {
+      const m = lines[i % ROWS];
+      g.fillStyle = 'rgba(160,168,190,0.35)';
+      g.fillRect(366 + m.indent * 3, 26 + i * 4.6, Math.min(28, 6 + width(m) / 10), 2);
+    }
+    g.fillStyle = 'rgba(217,212,199,0.1)';
+    g.fillRect(360, 60, W - 360, 52);
+    // status bar
+    g.fillStyle = '#1a1d2b';
+    g.fillRect(0, H - 12, W, 12);
+    g.fillStyle = '#f1ad56';
+    g.fillRect(0, H - 12, 34, 12);
+    texture.needsUpdate = true;
+  }
+
+  return {
+    texture,
+    /** `a` = how busy the editor is (0..1). Writes while busy; still when idle. */
+    step(t, dt, a) {
+      if (a > 0.05) {
+        if (!target) newLine();
+        typed += dt * 150 * a;
+        let left = typed;
+        target.tokens = [];
+        for (const tok of target.full) {
+          if (left <= 0) break;
+          target.tokens.push({ len: Math.min(tok.len, left), c: tok.c });
+          left -= tok.len + 7;
+        }
+        if (left > 12) newLine(); // line done: start the next one
+        dirty = true;
+      }
+      const blink = a > 0.05 ? Math.floor(t * 2.5) % 2 === 0 : true;
+      if (blink !== blinkOn) {
+        blinkOn = blink;
+        dirty = true;
+      }
+      if (live(P.neonCyanSoft) !== tint) {
+        tint = live(P.neonCyanSoft);
+        dirty = true;
+      }
+      if (dirty && t - lastDraw > 1 / 15) {
+        draw(blinkOn);
+        dirty = false;
+        lastDraw = t;
+      }
+    },
+  };
+}
+
+/** Camera-facing quads in one InstancedMesh (code bits). */
 function particles(count, map, billboard) {
   const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({
     map, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,

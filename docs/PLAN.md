@@ -41,7 +41,7 @@ driven by real events (verified by reading the server state), and switching lang
 - [x] Renderer: pixel ratio cap, pause on `visibilitychange`, resize to portrait window
 - [x] Isometric (orthographic) camera framed for portrait
 - [x] Floating metal platforms, pipes, neon edge strips, background haze
-- [x] Stations built from primitives: command desk, Code Smelter, Vision & Task Board, Test Centrifuge,
+- [x] Stations built from primitives: command desk, Code Smelter (now Code Editor, D63), Vision & Task Board, Test Centrifuge,
       Orbit Sphere, server racks, data waterfalls, portal ring, arcade machine
 - [x] Character from simple shapes (headphones, visor, hoodie). If not good enough: propose a CC0 model, ask first
 - [x] Bloom (UnrealBloomPass) with a toggle; fallback without postprocessing
@@ -73,13 +73,13 @@ stop) plays out visibly on screen with correct stations and no stuck states.
 **Done when:** every setting changes the screen live and survives a server restart.
 
 ## Stage 6 - Install, docs, release
-- [ ] Install script (PowerShell): `npm install`, back up `~/.claude/settings.json`, show the diff,
+- [x] Install script (PowerShell): `npm install`, back up `~/.claude/settings.json`, show the diff,
       merge hooks only after explicit confirmation; uninstall script restores the backup
 - [ ] Optional: start server on login / from a desktop shortcut
-- [ ] English README: what it is, screenshots, requirements, install, privacy (localhost only)
-- [ ] "How it was built" guide (`docs/HOW-IT-WAS-BUILT.md`) from PROGRESS + DECISIONS
-- [ ] Screenshots / short GIF of each state
+- [x] English README: what it is, screenshots, requirements, install, privacy (localhost only)
+- [x] "How it was built" guide (`docs/HOW-IT-WAS-BUILT.md`) from PROGRESS + DECISIONS
+- [ ] Screenshots / short GIF of each state (3 real screenshots so far, D62; no GIF)
 - [x] Choose a license with the user; add LICENSE file (MIT, 2026-10-09)
-- [ ] Cross-platform note: hook script for macOS/Linux (sh/curl) or document Windows-only
+- [x] Cross-platform note: hook script for macOS/Linux (sh/curl) or document Windows-only (D61)
 
 **Done when:** a fresh clone can be installed on another Windows machine by following only the README.

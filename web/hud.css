@@ -60,7 +60,7 @@ button { font: inherit; color: inherit; }
 .leaders g[data-active="true"] circle { fill: var(--station); }
 
 [data-station] { --station: var(--accent-soft); }
-[data-station="smelter"] { --station: var(--fire-orange); }
+[data-station="editor"] { --station: var(--fire-orange); }
 [data-station="board"] { --station: var(--accent-soft); }
 [data-station="centrifuge"] { --station: var(--warn-yellow); }
 [data-station="orbit"] { --station: var(--skill-web); }

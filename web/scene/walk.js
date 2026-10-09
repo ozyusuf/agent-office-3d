@@ -1,5 +1,6 @@
 // Where the character can walk: a ring around the command desk's dais plus one leg from the ring
-// out to each work spot. Plain numbers (no three.js), so node:test covers it.
+// out to each work spot, and at each spot a few stands it moves between while it stays there
+// (life.js). Plain numbers (no three.js), so node:test covers it.
 // World axes as in world.js: +x runs to the lower right of the screen, +z to the lower left, y is up.
 // The spots follow the station positions in props.js; angles are atan2(z, x) around the desk.
 
@@ -12,20 +13,77 @@ export const RING_R = 2.15;
 // and the console would hide the character; every arc goes round the front instead.
 const BACK = -135 * DEG;
 
+/** Station frames as built in props.js: position [x, z] and turn (rotation.y). */
+export const FRAMES = {
+  desk: [0, 0, YAW_CAMERA],
+  editor: [-2.55, 2.95, YAW_CAMERA + 0.35], // EDITOR_POS / EDITOR_YAW
+  board: [0.5, -3.8, YAW_CAMERA],
+};
+
+/** World [x, z] of a point given in a station's own frame (its local +z is its front). */
+export function inFrame(key, lx, lz) {
+  const [x, z, turn] = FRAMES[key];
+  return [x + lx * Math.cos(turn) + lz * Math.sin(turn), z - lx * Math.sin(turn) + lz * Math.cos(turn)];
+}
+
+/** Yaw (0 = facing +z) of a character in a station's frame looking from [lx, lz] at [tx, tz]. */
+function facing(key, [lx, lz], [tx, tz]) {
+  return Math.atan2(tx - lx, tz - lz) + FRAMES[key][2];
+}
+
+/**
+ * A stand: where the character stands (`at`, world [x, z]), which way it faces (`yaw`) and what it
+ * does there (`act`, see life.js), built from the station's own frame.
+ */
+function stand(key, act, local, lookAt) {
+  return { at: inFrame(key, ...local), yaw: facing(key, local, lookAt), act };
+}
+
+// Desk: everything stays inside the ring console (inner radius 1.2; the body is ~0.5 wide).
+const DESK_STANDS = [
+  { at: [-0.15, -0.15], yaw: YAW_CAMERA, act: 'keys' }, // at the holo keyboard, facing the camera
+  stand('desk', 'panel', [0.48, 0.12], [1.14, 0.9]), // the holo panel at screen right
+  stand('desk', 'panel', [-0.48, 0.12], [-1.14, 0.9]), // the holo panel at screen left
+  stand('desk', 'laptop', [-0.42, -0.3], [-1.35, 0.45]),
+  { at: inFrame('desk', 0.15, -0.5), yaw: YAW_CAMERA + 0.2, act: 'free' },
+];
+// Editor: in front of the bench; it types at the right end (the monitor stays visible).
+const EDITOR_STANDS = [
+  stand('editor', 'keys', [0.75, 0.9], [0.5, -0.1]),
+  stand('editor', 'study', [0.85, 1.35], [-0.2, -0.2]), // a step back (right of the monitor), studying it
+  stand('editor', 'duck', [-0.3, 0.98], [-0.78, 0.12]), // explaining it to the rubber duck
+];
+// Board: in front of it, presenting to the camera, or a step back studying it.
+const BOARD_STANDS = [
+  { at: [2.16, -3.13], yaw: 0.29, act: 'board' },
+  { at: inFrame('board', -0.2, 1.95), yaw: 0.29, act: 'board' },
+  stand('board', 'study', [0.3, 2.15], [0, 0.3]),
+];
+
 /**
  * Work spots. `phi`: where the leg leaves the ring; `points`: the leg from the ring out to the
- * spot (last point); `yaw`: which way the character faces there (0 = +z).
+ * spot (last point = the first stand); `yaw`: which way the character faces there (0 = +z);
+ * `stands`: where it moves while it stays (the first one is the spot itself).
  */
 export const SPOTS = {
   // inside the ring console, through its opening towards the camera
-  desk: { phi: 45 * DEG, points: [[-0.15, -0.15]], yaw: YAW_CAMERA },
-  // right of the furnace, turned a little towards the camera
-  smelter: { phi: 128 * DEG, points: [[-1.52, 1.92]], yaw: -0.15 },
+  desk: { phi: 45 * DEG, points: [DESK_STANDS[0].at], yaw: YAW_CAMERA, stands: DESK_STANDS },
+  // in front of the bench's right end, facing the monitor half side-on
+  editor: legTo(EDITOR_STANDS),
   // in front of the holo board's right half, half turned to it
-  board: { phi: -55 * DEG, points: [[2.16, -3.13]], yaw: 0.29 },
+  board: { phi: -55 * DEG, points: [BOARD_STANDS[0].at], yaw: 0.29, stands: BOARD_STANDS },
   // over the step onto the west platform, in front of the cabinet
-  arcade: { phi: 160 * DEG, points: [[-3.4, 1.4], [-4.6, 1.85], [-5.6, 1.9], [-6.2, 1.95]], yaw: -1.25 },
+  arcade: {
+    phi: 160 * DEG, points: [[-3.4, 1.4], [-4.6, 1.85], [-5.6, 1.9], [-6.2, 1.95]], yaw: -1.25,
+    stands: [{ at: [-6.2, 1.95], yaw: -1.25, act: 'arcade' }],
+  },
 };
+
+/** A straight leg from the ring out to the first stand. */
+function legTo(stands) {
+  const [x, z] = stands[0].at;
+  return { phi: Math.atan2(z, x), points: [stands[0].at], yaw: stands[0].yaw, stands };
+}
 
 /** Floor height under a point: dais, main platform, the step and the west platform. */
 export function floorAt(x, z) {
@@ -87,7 +145,7 @@ function arc(from, to) {
 /**
  * Waypoints [[x, z], ...] from point `from` to spot `to` (the last waypoint is the spot).
  * Off the ring the character only moves along legs, so it never walks through the console,
- * the furnace or the board.
+ * the editor bench or the board.
  */
 export function planPath(from, to) {
   const goal = legLine(to);

@@ -38,7 +38,7 @@ custom properties in `web/theme.css` and mirror them as numbers in the 3D code (
 | `--neon-blue` | `#2c78b9` | measured | holo screens, orbit sphere body |
 | `--neon-purple` | `#724bb6` | measured | secondary rings, session bar |
 | `--neon-magenta` | `#e350a4` | measured | portal ring, XP bar, accents |
-| `--fire-orange` | `#f1ad56` | measured (flame highlights) | furnace glow, Edit skill |
+| `--fire-orange` | `#f1ad56` | measured (flame highlights) | Code Editor lamps and `</>` sign, Edit skill |
 | `--fire-deep` | `#e0662a` | derived | flame base / embers |
 | `--warn-yellow` | `#f4c752` | measured | permission waiting, blink |
 | `--ok-green` | `#56d999` | measured (small status lights) | connected icon, rack LEDs |
@@ -110,7 +110,7 @@ Must also work down to 420 px wide. Nothing scrolls; the log scrolls inside itse
   activity value is accent, yellow while waiting for permission, red on error.
 - **Station callouts** (`web/labels.js`, D52): small uppercase labels on a dark chip, 16 px above the
   station, joined to it by a hairline leader with a dot. Idle: dim text and a grey square. Active:
-  bright text, the square and the leader in the station's colour. Always shown: Code Smelter,
+  bright text, the square and the leader in the station's colour. Always shown: Code Editor,
   Vision & Task Board, Terminal; only while active: Orbit Sphere, Server Racks, Portal Ring, Arcade;
   never: desk (the nameplate is there) and data falls (`web/stations.js`). Labels shrink with the
   scene (down to 70 %), step aside the shortest way when they overlap (nameplate first, then active
@@ -140,7 +140,7 @@ Must also work down to 420 px wide. Nothing scrolls; the log scrolls inside itse
 | Key | en | tr |
 |---|---|---|
 | desk | Command Desk | Komuta Masası |
-| smelter | Code Smelter | Kod Ocağı |
+| editor | Code Editor | Kod Editörü |
 | board | Vision & Task Board | Görüş ve Görev Panosu |
 | centrifuge | Terminal | Terminal |
 | orbit | Orbit Sphere | Yörünge Küresi |
@@ -169,7 +169,7 @@ Placement as seen in the reference (screen positions inside the realm view):
 | Object | Where | Look | Driven by |
 |---|---|---|---|
 | Command desk + character | centre | round dais with accent rings; ring console open towards the camera (a closed front hid the character), holo keyboard in the opening; character stands inside. Console rests at 0.42, dais rings at 0.3; both light up while the agent types and flash on a prompt | everything |
-| Code Smelter | left of centre, slightly lower | boxy furnace, orange fire core, sparks | Edit, Write, NotebookEdit |
+| Code Editor (D63) | left of centre, slightly lower | workbench turned a little towards the desk: a monitor showing an editor window (title bar, tabs, gutter, minimap; code as coloured bars, no text), a keyboard at the right end, a rubber duck at the left end, a `</>` emblem on the front panel and a `</>` sign floating over the monitor; at rest the sign and lamps are dim orange, the screen at 0.55. While it works the editor writes line by line at a blinking cursor (new lines push the rest down and get an orange change mark), `{ }` `( )` `;` bits float up off the screen and everything orange lights up | Edit, Write, NotebookEdit |
 | Vision & Task Board | right/behind character | large curved holo screen (blue, coloured code bars); screen 0.48 at rest, frame and projector beam light up | Read, Grep, Glob, todo/task tools |
 | Terminal (key `centrifuge`) | bottom right | 3 nested gimbal rings (orange, accent, yellow) on a base with a yellow rim; nearly dark at rest (0.09), spin up and blaze while a command runs | every Bash, PowerShell call |
 | Orbit Sphere | top right | blue glowing planet with 2 tilted rings, on a pipe pedestal | WebSearch, WebFetch |
@@ -198,21 +198,38 @@ integrated GPUs with the default settings (measured on Intel UHD, see PROGRESS s
 Settings: `bloom`, `pixelRatioCap` in config.json, changed from the settings panel (URL `?bloom` / `?pr`
 override them for one tab).
 
-Decoration vs data: the board's "code" is coloured bars only (no characters or numbers); the only
+Decoration vs data: the board's and the editor's "code" is coloured bars only (no characters or
+numbers; the `</>` sign and the floating `{ }` `( )` `;` bits are symbols, not text); the only
 real values in the 3D scene are the board's ticker (file name, search pattern, task chips), the
 lit rack LEDs (context fill) and the helper bots (one per running subagent). Ambient loops keep
 running at a low idle level; events speed them up. The sky, clouds and fireflies follow only the
-clock (or the `sky` setting) and stand for no session data.
+clock (or the `sky` setting) and stand for no session data. What the character does while it stays
+at a spot (strolling between stands, fidgets) is decoration too (D64); where it is is not.
 
 Stage 4 wiring (`web/scene/`): `director.js` turns the server snapshot (+ live events) into goals,
 `realm.js` eases a shared `drive` object towards them every frame (stations rise in ~0.2 s, settle
 back in ~1 s), stations / character / bots read `drive`. The character walks a fixed network
 (`walk.js`): a ring around the dais (r 2.15, never behind the console) plus one leg per spot:
-desk (inside the console), smelter (right of the furnace), board (in front of its right half),
-arcade (over the step on the west platform). Walks take ~1.2 s (3.2-7.5 units/s). It only follows
-the main agent's calls; it stays at a work station 2.5 s after the call ends (no running back and
-forth between calls), and every PreToolUse lights its station for at least 0.7 s, so 50 ms calls
-are still seen. Poses: stand, type, forge (hammer), present (points at the board), wave, play, slump.
+desk (inside the console), editor (in front of the bench's right end), board (in front of its right
+half), arcade (over the step on the west platform). Walks take ~1.2 s (3.2-7.5 units/s). It only
+follows the main agent's calls; it stays at a work station 2.5 s after the call ends (no running back
+and forth between calls), and every PreToolUse lights its station for at least 0.7 s, so 50 ms calls
+are still seen. Poses: stand, type, code, present (points at the board), wave, play, slump.
+
+Character life (D64, `life.js`, decoration only): the spot always follows the events; while the
+character stays there it moves between the spot's stands every 2-7 s at a stroll (1.5 units/s,
+`walk.js`): desk = holo keyboard (type), the two holo panels (swipe), the laptop (type), a free spot
+(hand at the chin, thinking); editor = keyboard (types, eyes on the monitor), a step back to the
+right (hands on hips, studying the screen without hiding it), the rubber duck (explains with both
+hands); board = two places in front of it (presents) and a step back (studies it). It mostly
+returns to the main stand, where the work is.
+Standing still it breathes, shifts its weight and fidgets now and then (looks round, stretches, nods
+to the music with a hand on the headphones, a little hop; rarely while working; cheers or leans back
+at the arcade). Turning on the spot takes small steps; walks swing the shoulders against the hips
+and run when long. It glances at a busy station it does not walk to (Terminal while a command runs,
+the orbit sphere for the web, the portal while helpers are out or one comes / goes, the racks while
+compacting). Waving, slumping and playing stay put. Reduced motion: no strolling, fidgets or
+reactions (it still goes where the work is).
 
 ## 5. Event -> reaction
 Every reaction is caused by a real event. "Pair" = matched by `tool_use_id`.
@@ -220,23 +237,23 @@ Every reaction is caused by a real event. "Pair" = matched by `tool_use_id`.
 | Event | Condition | 3D | HUD |
 |---|---|---|---|
 | SessionStart | any `source` | scene powers up from standby (dim), character appears at the desk in a light column, dais flashes | session timer starts; state working/idle; log "Session started (source)" |
-| UserPromptSubmit | - | dais flashes; character goes to the desk and types; clears waiting/error states | log "New request"; state working. Prompt text is NOT shown in the HUD (debug view only) |
+| UserPromptSubmit | - | dais flashes; character raises its fists with a little jump, goes to the desk and types; clears waiting/error states | log "New request"; state working. Prompt text is NOT shown in the HUD (debug view only) |
 | PreToolUse | Read | character walks to the Board and points at it; board brightens; file name runs along a ticker strip at the board's bottom | Read lights up on the skill rail; label "Reading (file)" |
 | PreToolUse | Grep, Glob | same, the ticker shows the pattern (magnifier icon) | Grep lights up on the skill rail; label "Searching (pattern)" |
-| PreToolUse | Edit, Write, NotebookEdit | character walks to the Smelter and hammers; flames grow, sparks fly, furnace glows | Edit lights up on the skill rail; label "Editing (file)" |
+| PreToolUse | Edit, Write, NotebookEdit | character walks to the Code Editor and types (now and then studies the screen or talks to the duck); the editor writes line by line, code bits float up, sign, emblem and lamps glow | Edit lights up on the skill rail; label "Editing (file)" |
 | PreToolUse | Bash, PowerShell | character types at the desk; Terminal rings spin up and brighten | Bash lights up on the skill rail; label "Running command" |
 | PreToolUse | WebSearch, WebFetch | character types at the desk; Orbit Sphere spins faster, rings brighten | Web lights up on the skill rail; label "Searching the web (host)" |
 | PreToolUse | TodoWrite, Task* tools | character to the Board; TodoWrite: ticker shows one chip per task (done green, in progress yellow, open outline; counts only) | label "Planning tasks" |
 | PreToolUse | anything else (MCP, Skill, ...) | character types at the desk; desk holograms pulse | log only |
 | PostToolUse | pair | station eases back to idle (~1 s); character stays 2.5 s, then returns to the desk | context +1, total +1 (XP); skill dims |
-| PostToolUseFailure | pair (fires instead of PostToolUse when a tool errors or is interrupted) | station sputters: drops dark at once, red flicker (~1 s) | context +1, total +1 (the call still used context); skill dims; log "Tool failed: error" or "Interrupted" |
+| PostToolUseFailure | pair (fires instead of PostToolUse when a tool errors or is interrupted) | station sputters: drops dark at once, red flicker (~1 s); a main-agent failure makes the character flinch (shoulders up, a shake of the head) | context +1, total +1 (the call still used context); skill dims; log "Tool failed: error" or "Interrupted" |
 | PermissionRequest | - | desk light turns yellow; character turns to the camera and waves (at its station) | yellow vignette blinks over the scene; Permission blinks yellow; state waiting; log "Permission needed: Tool (target)". Cleared by pair PostToolUse, next PreToolUse, UserPromptSubmit or Stop |
 | SubagentStart | per `agent_id` | helper bot rises out of the big portal (portal flares), hovers over the station of its current call, circles the portal while thinking | log "Helper launched (agent_type)"; Portal Ring label while helpers run |
 | SubagentStop | same `agent_id` | helper flies back over the portal and sinks into it; its unfinished calls end | log "Helper returned" |
 | PreCompact | `trigger` | rack strips flash, LEDs drain top to bottom (1.5 s) | log "Compacting context (auto/manual)" |
 | PostCompact | - | racks stay empty | context bar -> 0 |
 | Stop | - | character walks to the arcade and plays; arcade screen lights up; the scene lowers its lights a little; a shooting star crosses the sky if the stars are out | state idle; log "Turn finished" |
-| (derived) | XP crosses a level | gold sparks burst out of the character, a gold ring runs over the dais | "Level up · LV n" banner, badge pulses |
+| (derived) | XP crosses a level | gold sparks burst out of the character, a gold ring runs over the dais, the character cheers | "Level up · LV n" banner, badge pulses |
 | (derived) | transcript usage (main thread) | rack LEDs lit = tokens / window x 144 | context meter in tokens |
 | StopFailure | `error` (e.g. rate_limit) | lights go down, red alert pulse on every platform rim; a storm over the realm: darker clouds and sky, rain, soft lightning now and then; character slumps at the desk | red vignette; state error (red); label shows error type; cleared by next UserPromptSubmit/SessionStart |
 | SessionEnd | `reason` | scene dims to standby, character fades out in a light column | timer stops; state ended; log "Session ended (reason)" |

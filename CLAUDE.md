@@ -8,16 +8,19 @@ narrow portrait browser window next to VS Code. Open source; a "how it was built
 ## Architecture
 Claude Code hooks -> local server (127.0.0.1 only) -> WebSocket -> three.js page.
 - `hooks/send-event.ps1` - PowerShell hook script. Forwards the raw hook JSON (stdin) to `POST /event`.
-- `server/index.js` - Node HTTP + `ws`: `POST /event` (reorder by hook start time, history, broadcast
-  event + state), `POST /config` (settings panel), `GET /state`, serves `web/` + three.js at `/vendor/three/`.
+- `server/index.js` - Node HTTP + `ws`: `POST /event` (drop duplicates `dedupe.js`, reorder by hook start
+  time, history, broadcast event + state), `POST /config` (settings panel), `POST /shutdown` (stop.ps1),
+  `GET /state`, `GET /health`, serves `web/` + three.js at `/vendor/three/`.
 - `server/normalize.js` - raw hook JSON -> small display event. `server/state.js` - session state
   machine + level curve. `server/transcript.js` - context tokens from the transcript. `config.js`, `stats.js`.
 - `web/` - plain ES modules, no build step: HUD `index.html` + `app.js`, `hud.css`, `theme.css`, `i18n.js`,
   `narrate.js`, `stations.js`, `labels.js`, `palette.js`, `settings.js`, `context.js`; `debug.html` raw events.
   3D scene in `web/scene/`: `realm.js` (renderer, camera, bloom, loop, state -> `drive`), `director.js`
-  + `walk.js` + `daylight.js` (pure, tested), `world.js`, `sky.js`, `props.js`, `character.js`, `helpers.js`,
+  + `walk.js` + `life.js` + `daylight.js` (pure, tested), `world.js`, `sky.js`, `props.js`, `character.js`, `helpers.js`,
   `effects.js`, `kit.js`.
-- Local files (gitignored): `config.json` (see `config.example.json`), `data/stats.json` (XP).
+- Install (Windows, D58-D60): `install.ps1` / `uninstall.ps1` -> `scripts/setup.js` + pure `hooks-config.js`
+  (user settings: diff, "y", backup); `scripts/start.ps1`, `stop.ps1`, `shortcut.ps1`, `common.ps1`.
+- Local files (gitignored): `config.json` (see `config.example.json`), `data/` (stats.json = XP, install.json).
 
 ## Hard rules
 - Hooks are `type: "command"`, run by Windows PowerShell 5.1 (`powershell.exe`) with `"async": true`.
@@ -42,19 +45,16 @@ Claude Code hooks -> local server (127.0.0.1 only) -> WebSocket -> three.js page
 
 ## Commands
 ```
-npm install          # once
-npm start            # server on http://127.0.0.1:7847 (port: env AGENT_OFFICE_PORT > config.json)
-npm test             # node:test unit tests
+npm install; npm start   # server on http://127.0.0.1:7847 (port: env AGENT_OFFICE_PORT > config.json)
+npm test                 # node:test unit tests
 ```
-Test server that never touches the user's data: set `AGENT_OFFICE_PORT`, `AGENT_OFFICE_CONFIG`,
-`AGENT_OFFICE_DATA` to scratch values. Never send test events to the server the user watches.
-Test the hook by hand (PowerShell):
+Scratch test server (never the user's data): set `AGENT_OFFICE_PORT`, `AGENT_OFFICE_CONFIG`, `AGENT_OFFICE_DATA`.
+Never send test events to the server the user watches. Test the hook by hand (PowerShell):
 `'{"hook_event_name":"Stop","session_id":"t"}' | powershell -NoProfile -ExecutionPolicy Bypass -File hooks/send-event.ps1`
 
 ## Docs map
 - `docs/PLAN.md` - stages, checkbox tasks, "done" criteria per stage.
 - `docs/DESIGN.md` - palette, screen layout, scene objects, event -> reaction table.
-- `docs/PROGRESS.md` - session log: done, remaining, known issues, next step.
-- `docs/DECISIONS.md` - decisions and why.
-- `docs/design/reference.png` - target visual reference.
+- `docs/PROGRESS.md` - session log. `docs/DECISIONS.md` - decisions and why.
+- `docs/HOW-IT-WAS-BUILT.md` - public guide. `docs/screenshots/` - README images (real sessions only, D62).
 - `.claude/commands/next.md` (`/next`), `.claude/commands/wrap.md` (`/wrap`).

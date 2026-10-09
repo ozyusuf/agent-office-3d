@@ -1,8 +1,9 @@
 # Progress
 
 ## Current state
-- **Stage 5 done** (verified 2026-10-09) + a free redesign (the sky realm, D49-D57).
-  Next: **Stage 6 - install, docs, release.**
+- **Stage 6 mostly done** (2026-10-09): installer, README, guide, real screenshots, Windows-only note;
+  plus the user's follow-up: Code Editor station (D63) and a livelier character (D64).
+  Open: shortcuts and a fresh-clone install on another machine are not verified; no GIF.
 - Run: `npm install`, `npm start`, open http://127.0.0.1:7847 (HUD) or /debug.html (raw events).
   Restart the server after pulling new server code (an old `node server/index.js` keeps running
   the old code). `?hour=0..24` fixes the sky's time for one tab.
@@ -10,6 +11,39 @@
   in `data/stats.json` (gitignored).
 
 ## Session log (newest first)
+
+### 2026-10-09 - Session 6 - Stage 6 (install, docs, release) + follow-up
+**Done**
+- Stage 6 (earlier part of the session, ended early): `install.ps1` / `uninstall.ps1` +
+  `scripts/setup.js` and pure `hooks-config.js` (diff, "y", backup, byte-exact restore; D58),
+  duplicate-event guard `server/dedupe.js` (D59), `POST /shutdown`, `scripts/start.ps1` / `stop.ps1`
+  / `shortcut.ps1` (D60), Windows-only note (D61), English README, `docs/HOW-IT-WAS-BUILT.md`.
+- Follow-up (user): the "Kod Ocağı" furnace is now the **Code Editor / Kod Editörü** (key `editor`):
+  workbench, monitor whose editor writes line by line while Edit/Write run, `</>` sign + front
+  emblem, keyboard, rubber duck, floating `{ } ( ) ;` bits (D63).
+- Livelier character (`web/scene/life.js`, D64): moves between stands at each spot (desk: keys,
+  panels, laptop, thinking spot; editor: keys, step back, duck; board: two places, step back),
+  fidgets, small steps when turning, shoulder swing; reactions to a prompt / failure / level up;
+  glances at busy stations (Terminal, orbit, portal, racks). Reduced motion turns it off.
+- README screenshots retaken from the user's live monitor (real moments, no local paths in the log).
+- Privacy check of the public repo (all files + full history): no e-mail, name, local path,
+  session id or key; commits use the GitHub no-reply address.
+- Tests: 96 pass (new: stands geometry, stand choice, animations/gestures).
+- Checks: scratch server 7861 (scratch config/data) in headless Edge at 600x1000, 702x765 @1.5x,
+  420x900; day / sunset / night; film strips of idle, edit, read, bash, failure, prompt, stop.
+
+**Left:** desktop / log-in shortcuts not verified; a fresh clone on another Windows machine
+(stage 6 "done when") not tried; no GIF, only 3 states pictured (D62).
+
+**Known issues / open questions**
+- `docs/design/reference.png` (the original target image) shows a personal name ("Şimşek") and VS
+  Code's UI; its origin/licence is not recorded. Asked the user whether to keep it public.
+- While the character types at the editor its nameplate covers the floating `</>` sign (the front
+  emblem stays visible). At the duck stand it briefly hides part of the monitor.
+- fps still only measured in headless Edge (35-55).
+
+**Next step:** `/next` -> finish stage 6: install from a fresh clone following only the README
+(another folder or machine), check the shortcuts, decide on reference.png.
 
 ### 2026-10-09 - Session 5 - Stage 5 (settings) + redesign
 **Done**

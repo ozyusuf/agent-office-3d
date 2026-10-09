@@ -1,12 +1,15 @@
 // The agent: a chibi hacker built from primitives (big head, messy hair, cyan visor, headphones,
 // dark hoodie with cyan trims). Local +z is the front; feet at y = 0.
-// It walks the network in walk.js to the spot the director picks (director.js), then takes that
-// spot's pose. Arms are named by their side in local space: `armR` is at +x, which is screen right
-// while the character faces the camera.
+// It walks the network in walk.js to the spot the director picks (director.js) and works there in
+// that spot's pose. While it stays, it moves between the spot's stands, fidgets now and then and
+// glances at busy stations elsewhere (life.js), and it reacts to a few events (a new prompt, a
+// failed call, a level up). Arms are named by their side in local space: `armR` is at +x, which is
+// screen right while the character faces the camera.
 
 import * as THREE from 'three';
-import { P, rng, neon, solid, merged, flatRing, glowSprite, MAT, ease } from './kit.js';
+import { P, TAU, rng, neon, solid, merged, flatRing, glowSprite, ease } from './kit.js';
 import { SPOTS, YAW_CAMERA, planPath, pathLength, floorAt, spotPoint } from './walk.js';
+import { roams, animFor, nextStand, dwell, pickFidget, fidgetGap, envelope, GESTURE_S } from './life.js';
 
 const SCALE = 1.85;
 const HIP_Y = 0.45; // local height of the hip joints
@@ -14,9 +17,11 @@ const STRIDE = 5.6; // walk cycle (radians) per world unit walked (at walking sp
 const WALK_S = 1.2; // a walk takes about this long: speed = length / WALK_S, within the limits below
 const MIN_SPEED = 3.2; // world units per second
 const MAX_SPEED = 7.5;
+const STROLL_SPEED = 1.5; // between the stands of one spot
 const FADE_S = 0.8; // appear / fade out time
 
-export function buildCharacter() {
+/** @param {{ calm?: boolean }} options  calm = reduced motion: no strolling, fidgets or reactions */
+export function buildCharacter({ calm = false } = {}) {
   const root = new THREE.Group();
   root.name = 'character';
   const body = new THREE.Group(); // legs + upper body
@@ -106,24 +111,6 @@ export function buildCharacter() {
   const armR = arm(1);
   const armL = arm(-1);
 
-  // Forge hammer in the +x hand: the handle sticks out of the fist, perpendicular to the forearm.
-  const hammer = new THREE.Group();
-  hammer.position.y = -0.27;
-  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 0.46, 8), MAT.trim);
-  handle.rotation.x = Math.PI / 2;
-  handle.position.z = 0.17;
-  hammer.add(handle);
-  const hammerHead = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.3, 0.16), MAT.trim);
-  hammerHead.position.z = 0.42;
-  hammer.add(hammerHead);
-  for (const y of [-0.13, 0.13]) {
-    const hot = new THREE.Mesh(new THREE.BoxGeometry(0.155, 0.04, 0.165), neon(P.fireOrange, 2.6));
-    hot.position.set(0, y, 0.42);
-    hammer.add(hot);
-  }
-  hammer.visible = false;
-  armR.elbow.add(hammer);
-
   // Head
   const head = new THREE.Group();
   head.position.y = 1.2;
@@ -211,12 +198,22 @@ export function buildCharacter() {
   let heading = 'desk'; // spot the path leads to
   let path = [];
   let speed = MIN_SPEED; // of the current walk
+  let strolling = false; // the path is a short move between two stands of one spot
+  let standAt = 0; // stand of the heading spot it is at (or strolls to); 0 = the spot itself
+  let nextMove = 0; // when it moves to another stand
   let opacity = 0;
   let phase = 0; // walk cycle
   let moving = false;
+  let clock = 0;
+  let gesture = null; // { name, start, fidget }: a fidget or a reaction to an event
+  let nextFidget = 3;
+  let look = null; // world point of a busy station elsewhere, or null
+  let glance = 0; // 0..1: how far the head is turned towards it
+  const chance = rng(29); // choices of stands and fidgets
 
   const joints = makeJoints();
   const want = makeJoints();
+  const extra = makeJoints();
 
   function place() {
     root.position.set(pos.x, footY, pos.z);
@@ -224,29 +221,57 @@ export function buildCharacter() {
   }
   place();
 
+  function walk(points, stroll) {
+    path = points;
+    strolling = stroll;
+    const len = pathLength([pos.x, pos.z], path);
+    speed = stroll ? STROLL_SPEED : Math.min(MAX_SPEED, Math.max(MIN_SPEED, len / WALK_S));
+  }
+
   return {
     root,
     /** Writes the world point above the head (for the character label) into `out`. */
     headWorld(out) {
       return root.localToWorld(out.copy(headTop));
     },
-    /** The pose it is in now ('walk' while moving). */
-    pose: () => (moving ? 'walk' : goal.pose),
+    /** The pose it is in now ('walk' while walking to another spot). */
+    pose: () => (moving && !strolling ? 'walk' : goal.pose),
     setGoal(next) {
       goal = next;
-      if (next.spot === heading) return;
+      if (next.spot === heading) {
+        if (strolling && !roams(next.pose)) path = []; // waving, slumping: stop where it is
+        return;
+      }
+      const from = heading;
       heading = next.spot;
       if (opacity < 0.05) {
         // Not visible: appear right at the spot instead of walking there.
         [pos.x, pos.z] = spotPoint(heading);
         footY = floorAt(pos.x, pos.z);
         path = [];
+        standAt = 0;
         return;
       }
-      path = planPath([pos.x, pos.z], heading);
-      speed = Math.min(MAX_SPEED, Math.max(MIN_SPEED, pathLength([pos.x, pos.z], path) / WALK_S));
+      // Away from the spot's own point (another stand), it first steps back to it: the network
+      // only starts there.
+      if (strolling || standAt !== 0) {
+        const back = spotPoint(from);
+        walk([back, ...planPath(back, heading)], false);
+      } else {
+        walk(planPath([pos.x, pos.z], heading), false);
+      }
+      standAt = 0;
+    },
+    /** A short reaction to a real event: 'ready' (new prompt), 'flinch' (failed call), 'cheer' (level up). */
+    react(name) {
+      if (!calm && opacity > 0.5) gesture = { name, start: clock, fidget: false };
+    },
+    /** World point to glance at now and then (a busy station it does not walk to), or null. */
+    setLook(point) {
+      look = point;
     },
     tick(t, dt) {
+      clock = t;
       // Appear / fade out
       const target = goal.visible ? 1 : 0;
       if (opacity !== target) {
@@ -257,9 +282,21 @@ export function buildCharacter() {
       }
       root.visible = opacity > 0.004;
 
+      // While it stays at a spot it moves to another of its stands now and then.
+      const spot = SPOTS[heading];
+      if (!path.length && t >= nextMove && roams(goal.pose) && !goal.faceCamera && !calm && opacity > 0.5) {
+        const i = nextStand(spot.stands.length, standAt, chance);
+        if (i !== standAt) {
+          standAt = i;
+          walk([spot.stands[i].at], true);
+        }
+        nextMove = t + pathLength([pos.x, pos.z], path) / STROLL_SPEED + dwell(goal.pose, i, chance);
+      }
+
       // Walk along the path; long walks are run, so no walk takes much more than WALK_S.
+      const wasMoving = moving;
       moving = path.length > 0;
-      let face = goal.faceCamera ? YAW_CAMERA : SPOTS[heading].yaw;
+      let face = goal.faceCamera ? YAW_CAMERA : spot.stands[standAt].yaw;
       if (moving) {
         let step = speed * dt;
         phase += step * STRIDE * Math.min(1, 3.6 / speed); // longer strides when running
@@ -280,25 +317,90 @@ export function buildCharacter() {
             step = 0;
           }
         }
+        if (!path.length && !strolling) nextMove = t + dwell(goal.pose, 0, chance); // arrived: work a while
+        if (!path.length) strolling = false;
       }
+      const turn = angleTo(yaw, face);
       yaw = turnTowards(yaw, face, dt * (moving ? 12 : 6));
       footY = ease(footY, floorAt(pos.x, pos.z), dt, 0.06);
       place();
 
-      // Pose: blend all joints towards the wanted pose.
-      (moving ? walkPose : POSES[goal.pose] ?? POSES.stand)(want, t, phase);
+      // Pose: the work at this stand (or the walk), a gesture on top, a glance, then blend.
+      const anim = moving ? 'walk' : animFor(goal.pose, spot.stands[standAt].act);
+      if (moving) walkPose(want, t, phase, strolling ? 0 : Math.min(1, Math.max(0, (speed - 2) / 4)));
+      else (POSES[anim] ?? POSES.stand)(want, t);
+
+      if (moving && !wasMoving && gesture?.fidget) gesture = null;
+      if (!gesture && !moving && !calm && t >= nextFidget) {
+        const name = pickFidget(anim, chance);
+        if (name) gesture = { name, start: t, fidget: true };
+        nextFidget = t + fidgetGap(anim, chance) + (name ? GESTURE_S[name] : 0);
+      }
+      if (gesture) {
+        const k = (t - gesture.start) / GESTURE_S[gesture.name];
+        if (k >= 1) {
+          gesture = null;
+        } else {
+          copyJoints(extra, want);
+          GESTURES[gesture.name](extra, t, k);
+          if (moving) Object.assign(extra, { hipR: want.hipR, hipL: want.hipL, lift: 0 }); // the legs keep walking
+          mix(want, extra, envelope(k));
+        }
+      }
+
+      // Glance at a busy station elsewhere (the Terminal while a command runs, the orbit sphere for
+      // the web, the portal while helpers are out): in short looks while working, longer when free.
+      let rel = 0;
+      let up = 0;
+      if (look) {
+        const dx = look.x - pos.x;
+        const dz = look.z - pos.z;
+        rel = angleTo(yaw, Math.atan2(dx, dz));
+        up = Math.atan2(look.y - (footY + 2.2), Math.hypot(dx, dz));
+      }
+      const free = anim === 'stand' || anim === 'think' || anim === 'study';
+      const wantGlance = look && !moving && LOOKS.has(anim) && Math.abs(rel) < 2 && (free || t % 4.5 < 1.8) ? 1 : 0;
+      glance = ease(glance, wantGlance, dt, 0.25);
+      if (glance > 0.001) {
+        want.head[1] += (Math.max(-1.1, Math.min(1.1, rel)) - want.head[1]) * glance;
+        want.head[0] += (-Math.max(-0.35, Math.min(0.5, up)) * 0.8 - want.head[0]) * glance;
+      }
+
+      // Turning on the spot: small steps instead of sliding round.
+      if (!moving && Math.abs(turn) > 0.12) {
+        phase += dt * 10;
+        want.hipR = -0.28 * Math.sin(phase);
+        want.hipL = 0.28 * Math.sin(phase);
+      }
+
       blend(joints, want, 1 - Math.exp(-dt * 10));
-      apply(joints, { armR, armL, head, hips, upper });
-      hammer.visible = !moving && goal.pose === 'forge';
+      apply(joints, { armR, armL, head, hips, upper, body });
     },
   };
 }
 
 // ---- Poses ----
 
+const JOINTS3 = ['rS', 'rE', 'lS', 'lE', 'head'];
+const JOINTS1 = ['hipR', 'hipL', 'lean', 'bob', 'twist', 'sway', 'lift'];
+
 function makeJoints() {
-  return { rS: [0, 0, 0], rE: [0, 0, 0], lS: [0, 0, 0], lE: [0, 0, 0], head: [0, 0, 0], hipR: 0, hipL: 0, lean: 0, bob: 0 };
+  const j = { rS: [0, 0, 0], rE: [0, 0, 0], lS: [0, 0, 0], lE: [0, 0, 0], head: [0, 0, 0] };
+  for (const key of JOINTS1) j[key] = 0;
+  return j;
 }
+
+function copyJoints(to, from) {
+  for (const key of JOINTS3) for (let i = 0; i < 3; i++) to[key][i] = from[key][i];
+  for (const key of JOINTS1) to[key] = from[key];
+}
+
+/** Moves `cur` towards `want` by k (0..1). */
+function mix(cur, want, k) {
+  for (const key of JOINTS3) for (let i = 0; i < 3; i++) cur[key][i] += (want[key][i] - cur[key][i]) * k;
+  for (const key of JOINTS1) cur[key] += (want[key] - cur[key]) * k;
+}
+const blend = mix;
 
 const set = (v, x, y, z) => {
   v[0] = x;
@@ -306,41 +408,87 @@ const set = (v, x, y, z) => {
   v[2] = z;
 };
 
+// Animations in which the head may turn to glance at another station.
+const LOOKS = new Set(['stand', 'type', 'code', 'think', 'study', 'swipe']);
+
 function rest(w, t) {
-  set(w.rS, 0.05, 0, 0.13);
+  set(w.rS, 0.05, 0, 0.13 + Math.sin(t * 1.1) * 0.025);
   set(w.rE, -0.25, 0, 0);
-  set(w.lS, 0.05, 0, -0.13);
+  set(w.lS, 0.05, 0, -0.13 - Math.sin(t * 1.1 + 1) * 0.025);
   set(w.lE, -0.25, 0, 0);
-  set(w.head, 0, 0, Math.sin(t * 0.9) * 0.04);
+  set(w.head, Math.sin(t * 0.5) * 0.04, Math.sin(t * 0.37) * 0.16, Math.sin(t * 0.9) * 0.04);
   w.hipR = 0;
   w.hipL = 0;
   w.lean = 0;
   w.bob = Math.sin(t * 2.2) * 0.012; // breathing
+  w.twist = Math.sin(t * 0.45) * 0.05;
+  w.sway = Math.sin(t * 0.7) * 0.03; // weight from one foot to the other
+  w.lift = 0;
 }
 
 const POSES = {
   stand: rest,
-  // At the desk: both hands on the holo keyboard.
+  // At the desk: both hands on the holo keyboard; eyes on the keys, now and then up at the screens.
   type(w, t) {
     rest(w, t);
     set(w.rS, -0.95, 0, 0.2);
     set(w.rE, -0.75 + Math.sin(t * 14) * 0.09, 0, -0.18);
     set(w.lS, -0.95, 0, -0.2);
     set(w.lE, -0.75 + Math.sin(t * 14 + 1.9) * 0.09, 0, 0.18);
-    set(w.head, 0.2, 0, Math.sin(t * 0.9) * 0.03);
-    w.lean = 0.06;
+    const up = Math.max(0, Math.sin(t * 0.7)) ** 3;
+    set(w.head, 0.22 - 0.36 * up + Math.sin(t * 3.1) * 0.025, Math.sin(t * 0.43) * 0.2 * up, Math.sin(t * 0.9) * 0.03);
+    w.lean = 0.06 + Math.sin(t * 0.6) * 0.02;
+    w.sway = Math.sin(t * 0.8) * 0.02;
   },
-  // At the smelter: hammer up slowly, strike fast.
-  forge(w, t) {
+  // At the editor's keyboard: types, eyes on the monitor (to its +x side).
+  code(w, t) {
+    POSES.type(w, t);
+    set(w.head, 0.06 + Math.sin(t * 2.3) * 0.03, 0.42 + Math.sin(t * 0.5) * 0.1, Math.sin(t * 0.9) * 0.03);
+    w.twist = 0.08;
+  },
+  // At a holo panel: one hand swipes over it.
+  swipe(w, t) {
     rest(w, t);
-    const c = (t * 1.1) % 1;
-    const up = c < 0.72 ? Math.sin((c / 0.72) * Math.PI / 2) : 1 - (c - 0.72) / 0.28;
-    set(w.rS, -0.35 - 1.7 * up, 0, 0.15);
-    set(w.rE, -0.5 + 0.35 * up, 0, 0);
-    set(w.lS, -0.7, 0, -0.25);
-    set(w.lE, -0.9, 0, 0.25);
-    set(w.head, 0.28, 0, 0);
-    w.lean = 0.1 - 0.05 * up;
+    const s = Math.sin(t * 2.4);
+    set(w.rS, -1.45 + Math.sin(t * 1.2) * 0.1, 0, 0.3 + s * 0.35);
+    set(w.rE, -0.35, 0, -0.2);
+    set(w.lS, 0.1, 0, -0.15);
+    set(w.lE, -0.4, 0, 0);
+    set(w.head, -0.12, s * 0.08, 0);
+    w.lean = -0.02;
+    w.twist = -0.06 + s * 0.05;
+  },
+  // Thinking: a hand at the chin, the other arm across, head tilted.
+  think(w, t) {
+    rest(w, t);
+    set(w.rS, -0.8, 0, -0.45);
+    set(w.rE, -2.0, 0, 0);
+    set(w.lS, -0.35, 0, 0.25);
+    set(w.lE, -1.45, 0, 0);
+    set(w.head, -0.18 + Math.sin(t * 0.8) * 0.05, Math.sin(t * 0.35) * 0.3, 0.12);
+    w.sway = Math.sin(t * 0.6) * 0.04;
+  },
+  // A step back from the board or the monitor: hands on the hips, looking at it, nodding.
+  study(w, t) {
+    rest(w, t);
+    set(w.rS, 0.15, 0, 0.42);
+    set(w.rE, -0.35, 0, -1.6);
+    set(w.lS, 0.15, 0, -0.42);
+    set(w.lE, -0.35, 0, 1.6);
+    set(w.head, -0.2 + Math.sin(t * 1.7) * 0.05, Math.sin(t * 0.4) * 0.2, 0);
+    w.lean = -0.04;
+  },
+  // Explaining the code to the rubber duck: both hands talk, head nods.
+  duck(w, t) {
+    rest(w, t);
+    const a = Math.sin(t * 3.2);
+    const b = Math.sin(t * 3.2 + 2.1);
+    set(w.rS, -0.75 + a * 0.18, 0, 0.3 + b * 0.1);
+    set(w.rE, -0.9 + b * 0.3, 0, -0.35);
+    set(w.lS, -0.75 + b * 0.18, 0, -0.3 - a * 0.1);
+    set(w.lE, -0.9 + a * 0.3, 0, 0.35);
+    set(w.head, 0.32 + Math.sin(t * 4.1) * 0.06, Math.sin(t * 0.9) * 0.1, Math.sin(t * 1.3) * 0.08);
+    w.lean = 0.12;
   },
   // At the board: the -x arm points up at the screen and swipes, the other hand on the hip.
   present(w, t) {
@@ -358,7 +506,7 @@ const POSES = {
     set(w.rE, 0, 0, 0.95 + Math.sin(t * 8) * 0.45);
     set(w.head, 0, 0, Math.sin(t * 4) * 0.1);
   },
-  // At the arcade: hands on stick and buttons.
+  // At the arcade: hands on stick and buttons, swaying with the game.
   play(w, t) {
     rest(w, t);
     set(w.rS, -0.85, 0, 0.18);
@@ -367,6 +515,8 @@ const POSES = {
     set(w.lE, -0.95, 0, 0.12);
     set(w.head, 0.1, Math.sin(t * 2.7) * 0.06, 0);
     w.bob = Math.abs(Math.sin(t * 5)) * 0.015;
+    w.sway = Math.sin(t * 4.3) * 0.04;
+    w.lean = 0.05;
   },
   // StopFailure: head down, arms hanging.
   slump(w, t) {
@@ -378,30 +528,117 @@ const POSES = {
     set(w.head, 0.45, 0, Math.sin(t * 0.7) * 0.1);
     w.lean = 0.12;
     w.bob = -0.03;
+    w.twist = 0;
+    w.sway = 0;
   },
 };
 
-function walkPose(w, t, phase) {
+// Gestures on top of the pose; `k` = progress 0..1 (life.js gives their length and the envelope).
+const GESTURES = {
+  // look round to one side, then the other
+  look(w, t, k) {
+    w.head[0] = -0.08;
+    w.head[1] = Math.sin(k * TAU) * 0.85;
+  },
+  stretch(w) {
+    set(w.rS, -0.25, 0, 2.7);
+    set(w.rE, 0, 0, 0.35);
+    set(w.lS, -0.25, 0, -2.7);
+    set(w.lE, 0, 0, -0.35);
+    w.head[0] = -0.3;
+    w.lean = -0.12;
+    w.lift = 0.03;
+  },
+  // a hand on the headphones, nodding to the music
+  music(w, t) {
+    const beat = Math.sin(t * TAU * 1.6);
+    set(w.rS, -0.15, 0, 1.45);
+    set(w.rE, 0, 0, 2.1);
+    set(w.head, 0.12 * beat, w.head[1], 0.08 * Math.sin(t * TAU * 0.8));
+    w.bob = 0.02 * Math.abs(beat);
+    w.sway = 0.06 * Math.sin(t * TAU * 0.8);
+  },
+  // both hands push the headphones on
+  headphones(w) {
+    set(w.rS, -0.15, 0, 1.45);
+    set(w.rE, 0, 0, 2.1);
+    set(w.lS, -0.15, 0, -1.45);
+    set(w.lE, 0, 0, -2.1);
+    w.head[2] = 0;
+  },
+  hop(w, t, k) {
+    const h = Math.sin(Math.PI * k);
+    w.lift = 0.16 * h;
+    w.hipR = -0.3 * h;
+    w.hipL = 0.15 * h;
+    set(w.rS, -0.3, 0, 0.5 + 0.6 * h);
+    set(w.lS, -0.3, 0, -0.5 - 0.6 * h);
+  },
+  // arms out in front, a stretch of the fingers
+  crack(w) {
+    set(w.rS, -1.5, 0, 0.12);
+    set(w.rE, 0, 0, 0);
+    set(w.lS, -1.5, 0, -0.12);
+    set(w.lE, 0, 0, 0);
+    w.lean = -0.05;
+    w.head[0] = 0;
+  },
+  cheer(w, t) {
+    const p = Math.abs(Math.sin(t * 9));
+    set(w.rS, -0.3, 0, 2.45 + 0.25 * p);
+    set(w.rE, 0, 0, 0.4);
+    set(w.lS, -0.3, 0, -2.45 - 0.25 * p);
+    set(w.lE, 0, 0, -0.4);
+    w.head[0] = -0.3;
+    w.lift = 0.07 * p;
+  },
+  // leans back from the game
+  lean(w) {
+    w.lean = -0.18;
+    w.head[0] = -0.1;
+  },
+  // a call failed: shoulders up, a shake of the head
+  flinch(w, t, k) {
+    set(w.rS, -0.4, 0, 0.55);
+    set(w.rE, -1.3, 0, 0);
+    set(w.lS, -0.4, 0, -0.55);
+    set(w.lE, -1.3, 0, 0);
+    set(w.head, -0.25, Math.sin(t * 30) * 0.15 * (1 - k), 0);
+    w.lean = -0.16;
+    w.bob = -0.02;
+  },
+  // a new prompt: fists up, a little jump, ready to go
+  ready(w, t, k) {
+    const h = Math.sin(Math.PI * k);
+    set(w.rS, -1.1, 0, 0.35);
+    set(w.rE, -1.7, 0, 0);
+    set(w.lS, -1.1, 0, -0.35);
+    set(w.lE, -1.7, 0, 0);
+    w.head[0] = -0.15;
+    w.lift = 0.1 * h;
+  },
+};
+
+/** Walking (run 0) to running (run 1): arms swing against the legs, shoulders against the hips. */
+function walkPose(w, t, phase, run) {
   const s = Math.sin(phase);
-  set(w.rS, 0.45 * s, 0, 0.12);
-  set(w.rE, -0.45, 0, 0);
-  set(w.lS, -0.45 * s, 0, -0.12);
-  set(w.lE, -0.45, 0, 0);
-  set(w.head, 0.05, 0, 0);
-  w.hipR = -0.55 * s;
-  w.hipL = 0.55 * s;
-  w.lean = 0.08;
-  w.bob = Math.abs(s) * 0.045;
+  const c = Math.cos(phase);
+  const arm = 0.4 + 0.3 * run;
+  set(w.rS, arm * s, 0, 0.12 + 0.06 * run);
+  set(w.rE, -0.45 - 0.5 * run, 0, 0);
+  set(w.lS, -arm * s, 0, -0.12 - 0.06 * run);
+  set(w.lE, -0.45 - 0.5 * run, 0, 0);
+  set(w.head, 0.05, -0.1 * s, 0.03 * c);
+  w.hipR = -(0.5 + 0.15 * run) * s;
+  w.hipL = (0.5 + 0.15 * run) * s;
+  w.lean = 0.06 + 0.12 * run;
+  w.bob = Math.abs(s) * (0.04 + 0.03 * run);
+  w.twist = 0.12 * s;
+  w.sway = 0.035 * c;
+  w.lift = 0;
 }
 
-function blend(cur, want, k) {
-  for (const key of ['rS', 'rE', 'lS', 'lE', 'head']) {
-    for (let i = 0; i < 3; i++) cur[key][i] += (want[key][i] - cur[key][i]) * k;
-  }
-  for (const key of ['hipR', 'hipL', 'lean', 'bob']) cur[key] += (want[key] - cur[key]) * k;
-}
-
-function apply(j, { armR, armL, head, hips, upper }) {
+function apply(j, { armR, armL, head, hips, upper, body }) {
   armR.shoulder.rotation.set(...j.rS);
   armR.elbow.rotation.set(...j.rE);
   armL.shoulder.rotation.set(...j.lS);
@@ -409,15 +646,22 @@ function apply(j, { armR, armL, head, hips, upper }) {
   head.rotation.set(...j.head);
   hips[1].rotation.x = j.hipR;
   hips[-1].rotation.x = j.hipL;
-  upper.rotation.x = j.lean;
+  upper.rotation.set(j.lean, j.twist, j.sway);
   upper.position.y = HIP_Y + j.bob;
+  body.position.y = j.lift;
+}
+
+/** Signed angle from `a` to `b`, the short way round. */
+function angleTo(a, b) {
+  let d = (b - a) % TAU;
+  if (d > Math.PI) d -= TAU;
+  if (d < -Math.PI) d += TAU;
+  return d;
 }
 
 /** Turns angle `a` towards `b` the short way round, by at most `max` radians. */
 function turnTowards(a, b, max) {
-  let d = (b - a) % (2 * Math.PI);
-  if (d > Math.PI) d -= 2 * Math.PI;
-  if (d < -Math.PI) d += 2 * Math.PI;
+  const d = angleTo(a, b);
   return a + Math.max(-max, Math.min(max, d));
 }
 

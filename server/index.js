@@ -12,6 +12,7 @@ import { loadConfig, checkUpdate, saveConfig } from './config.js';
 import { HudState } from './state.js';
 import { loadStats, createStatsWriter } from './stats.js';
 import { readContext } from './transcript.js';
+import { Deduper } from './dedupe.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const WEB_DIR = path.join(ROOT, 'web');
@@ -39,6 +40,7 @@ const loaded = loadStats(statsFile);
 if (loaded.warning) console.warn(`Warning: ${loaded.warning}`);
 const hud = new HudState({ xp: loaded.xp });
 const statsWriter = createStatsWriter(statsFile);
+const deduper = new Deduper(); // drops a hook that ran twice for one event (D59)
 
 const allowedHosts = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
 const allowedOrigins = new Set([...allowedHosts].map((h) => `http://${h}`));
@@ -145,13 +147,16 @@ function handleEvent(req, res) {
   req.on('end', () => {
     if (size > MAX_BODY) return sendText(res, 413, 'Too large');
     res.writeHead(204).end();
+    const body = Buffer.concat(chunks);
+    const hookTs = Number(req.headers['x-hook-ts']);
+    if (deduper.isCopy(body, hookTs)) return;
     let raw;
     try {
-      raw = JSON.parse(Buffer.concat(chunks).toString('utf8').replace(/^﻿/, ''));
+      raw = JSON.parse(body.toString('utf8').replace(/^﻿/, ''));
     } catch {
       return;
     }
-    const event = normalize(raw, { receivedAt: Date.now(), hookTs: Number(req.headers['x-hook-ts']) });
+    const event = normalize(raw, { receivedAt: Date.now(), hookTs });
     if (event) {
       enqueue(event);
       watchContext(raw);
@@ -201,6 +206,16 @@ function handleConfig(req, res) {
   });
 }
 
+// scripts/stop.ps1 ends a server that runs without a window. Same guard as /event: our header and
+// no Origin, so a web page cannot do it (D6). A graceful exit saves the XP file first.
+function handleShutdown(req, res) {
+  req.resume();
+  if (req.headers['x-agent-office'] !== '1' || req.headers.origin) return sendText(res, 403, 'Forbidden');
+  sendText(res, 200, 'Stopping');
+  console.log('Stop requested by scripts/stop.ps1');
+  shutdown();
+}
+
 async function serveStatic(pathname, res) {
   let rel;
   try {
@@ -244,8 +259,9 @@ const server = http.createServer((req, res) => {
   const { pathname } = new URL(req.url, 'http://local');
   if (req.method === 'POST' && pathname === '/event') return handleEvent(req, res);
   if (req.method === 'POST' && pathname === '/config') return handleConfig(req, res);
+  if (req.method === 'POST' && pathname === '/shutdown') return handleShutdown(req, res);
   if (req.method === 'GET' && pathname === '/health') {
-    return sendJson(res, { ok: true, version, clients: wss.clients.size, events: nextId - 1 });
+    return sendJson(res, { ok: true, version, clients: wss.clients.size, events: nextId - 1, duplicates: deduper.dropped });
   }
   if (req.method === 'GET' && pathname === '/state') return sendJson(res, { config, state: hud.snapshot() });
   if (req.method === 'GET') return serveStatic(pathname, res);
@@ -285,11 +301,11 @@ server.listen(PORT, HOST, () => {
   console.log(`agent-office-3d ${version} listening on http://${HOST}:${PORT}`);
 });
 
-for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
-  process.on(signal, () => {
-    statsWriter.flush();
-    for (const client of wss.clients) client.close(1001, 'server shutting down');
-    server.close(() => process.exit(0));
-    setTimeout(() => process.exit(0), 500).unref();
-  });
+function shutdown() {
+  statsWriter.flush();
+  for (const client of wss.clients) client.close(1001, 'server shutting down');
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 500).unref();
 }
+
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, shutdown);

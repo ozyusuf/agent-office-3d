@@ -34,7 +34,8 @@ const MIN_FRAME_MS = 1000 / 75;
 const FIT_WIDTH = 0.78;
 const FIT_HEIGHT = 1.0;
 const EXPOSURE = 1.05;
-const STATION_KEYS = ['desk', 'smelter', 'board', 'centrifuge', 'orbit', 'racks', 'portal', 'arcade'];
+const STATION_KEYS = ['desk', 'editor', 'board', 'centrifuge', 'orbit', 'racks', 'portal', 'arcade'];
+const GLANCE_AT = ['centrifuge', 'orbit', 'portal', 'racks']; // first busy one wins
 
 /**
  * @param {HTMLElement} container  full-window element that receives the canvas
@@ -72,14 +73,15 @@ export function createRealm(container, options) {
   const director = createDirector();
   const world = buildWorld(scene, drive);
   const props = buildProps(scene, camera, drive);
-  const character = buildCharacter();
+  // Reduced motion: the sky keeps still (no drift, twinkle, shooting stars or lightning), no sparks,
+  // and the character only goes where the work is (no strolling, fidgets or reactions).
+  const calm = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  const character = buildCharacter({ calm });
   scene.add(character.root);
   const helpers = buildHelpers(scene, { portal: props.hovers.portal, hovers: props.hovers }, () => {
     drive.portalFlash = 1;
   });
   scene.add(camera); // the sky's camera-space layers (gradient, stars, sun, moon) are its children
-  // Reduced motion: the sky keeps still (no drift, twinkle, shooting stars or lightning), no sparks.
-  const calm = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   const sky = buildSky(scene, camera, { hour: options.hour, calm });
   const effects = createEffects(scene, { calm });
   const ticks = [...world.ticks, ...props.ticks, character.tick, helpers.tick, ...sky.ticks, effects.tick];
@@ -98,6 +100,9 @@ export function createRealm(container, options) {
     const goal = director.character(focus, now);
     character.setGoal(goal);
     const on = director.stations(focus, now);
+    // The character glances at a busy station it does not walk to (Terminal, orbit, portal, racks).
+    const glanceAt = GLANCE_AT.find((key) => on.has(key) || (key === 'portal' && drive.portalFlash > 0.05));
+    character.setLook(glanceAt ? props.cores[glanceAt] ?? props.anchors[glanceAt] : null);
     for (const key of STATION_KEYS) {
       const want = on.has(key) ? 1 : 0;
       // Quick to start, about a second to settle back to idle.
@@ -312,8 +317,10 @@ export function createRealm(container, options) {
         const station = stationForKind(e.kind);
         drive.sputter[station] = 1;
         drive.act[station] = Math.min(drive.act[station], 0.15);
+        if (!e.agentId) character.react('flinch');
       }
       if (e.event === 'UserPromptSubmit' || e.event === 'SessionStart') drive.prompt = 1;
+      if (e.event === 'UserPromptSubmit') character.react('ready');
       if (e.event === 'Stop' && !e.agentId) sky.shootingStar(); // a finished turn, if the stars are out
     },
     /** World point -> CSS pixel position in the window. */
@@ -323,7 +330,10 @@ export function createRealm(container, options) {
     },
     reframe: frame,
     /** The level went up (real XP): sparks out of the character. */
-    levelUp: () => effects.levelUp(character.root.position),
+    levelUp() {
+      effects.levelUp(character.root.position);
+      character.react('cheer');
+    },
     /** The sky setting changed: show the new time of day at once. */
     refreshSky: () => sky.update(),
     /** Current scene scale: CSS pixels per world unit. */

@@ -91,7 +91,7 @@ const STRINGS = {
     'skill.permissionWaiting': 'Permission needed',
 
     'station.desk': 'Command Desk',
-    'station.smelter': 'Code Smelter',
+    'station.editor': 'Code Editor',
     'station.board': 'Vision & Task Board',
     'station.centrifuge': 'Terminal',
     'station.orbit': 'Orbit Sphere',
@@ -257,7 +257,7 @@ const STRINGS = {
     'skill.permissionWaiting': 'İzin Bekliyor',
 
     'station.desk': 'Komuta Masası',
-    'station.smelter': 'Kod Ocağı',
+    'station.editor': 'Kod Editörü',
     'station.board': 'Görüş ve Görev Panosu',
     'station.centrifuge': 'Terminal',
     'station.orbit': 'Yörünge Küresi',

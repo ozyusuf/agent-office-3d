@@ -203,7 +203,7 @@ function canvasTexture(w, h, draw, { color = true, wrap = false } = {}) {
 }
 
 export const TEX = {
-  /** Soft round glow (white -> transparent), for halos, flames, haze, particles. */
+  /** Soft round glow (white -> transparent), for halos, haze, particles. */
   get glow() {
     return cached('tex|glow', () => canvasTexture(64, 64, (g, w) => {
       const r = w / 2;
@@ -214,22 +214,6 @@ export const TEX = {
       grad.addColorStop(1, 'rgba(255,255,255,0)');
       g.fillStyle = grad;
       g.fillRect(0, 0, w, w);
-    }));
-  },
-
-  /** Tall flame tongue: bright base, tapering tip. */
-  get flame() {
-    return cached('tex|flame', () => canvasTexture(64, 128, (g, w, h) => {
-      const grad = g.createRadialGradient(w / 2, h * 0.72, 2, w / 2, h * 0.6, h * 0.5);
-      grad.addColorStop(0, 'rgba(255,255,255,1)');
-      grad.addColorStop(0.35, 'rgba(255,255,255,0.6)');
-      grad.addColorStop(1, 'rgba(255,255,255,0)');
-      g.fillStyle = grad;
-      g.beginPath();
-      g.moveTo(w / 2, 0);
-      g.bezierCurveTo(w * 0.95, h * 0.45, w, h * 0.95, w / 2, h);
-      g.bezierCurveTo(0, h * 0.95, w * 0.05, h * 0.45, w / 2, 0);
-      g.fill();
     }));
   },
 

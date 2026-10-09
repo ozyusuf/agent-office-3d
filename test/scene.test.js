@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { SPOTS, RING_R, planPath, pathLength, floorAt, spotPoint } from '../web/scene/walk.js';
+import { SPOTS, RING_R, FRAMES, planPath, pathLength, floorAt, spotPoint } from '../web/scene/walk.js';
+import { roams, animFor, nextStand, dwell, pickFidget, fidgetGap, envelope, GESTURE_S } from '../web/scene/life.js';
 import { createDirector, eventRate, fallsSpeed, rackTarget, powerOf, alertOf, LINGER_MS, HOLD_MS } from '../web/scene/director.js';
 
 // ---- Walking ----
@@ -38,7 +39,7 @@ test('every path ends at its spot and never crosses the desk console', () => {
 });
 
 test('arcs go round the front of the desk, never behind it', () => {
-  for (const [a, b] of [['board', 'arcade'], ['arcade', 'board'], ['board', 'smelter'], ['smelter', 'board']]) {
+  for (const [a, b] of [['board', 'arcade'], ['arcade', 'board'], ['board', 'editor'], ['editor', 'board']]) {
     for (const [x, z] of planPath(spotPoint(a), b)) {
       if (Math.abs(Math.hypot(x, z) - RING_R) > 1e-6) continue;
       assert.ok(x + z > -1.6, `${a} -> ${b}: ring point (${x.toFixed(2)}, ${z.toFixed(2)}) is behind the console`);
@@ -54,7 +55,7 @@ test('a path from the middle of a walk turns around on the network', () => {
   assert.ok(pathLength(from, path) < 12);
   assert.ok(path[0][0] > from[0], 'first step goes back towards the ring');
   // Already at the spot: nothing left to walk.
-  assert.ok(pathLength(spotPoint('smelter'), planPath(spotPoint('smelter'), 'smelter')) < 1e-9);
+  assert.ok(pathLength(spotPoint('editor'), planPath(spotPoint('editor'), 'editor')) < 1e-9);
 });
 
 test('floor heights: dais, main platform, step, west platform', () => {
@@ -62,6 +63,80 @@ test('floor heights: dais, main platform, step, west platform', () => {
   assert.equal(floorAt(3, 3), 0);
   assert.equal(floorAt(-5, 1.8), 0.175);
   assert.equal(floorAt(...spotPoint('arcade')), 0.35);
+});
+
+// ---- Stands (where the character moves while it stays at a spot) ----
+
+/** A point in a station's own frame (inverse of walk.js inFrame). */
+function toFrame(key, [x, z]) {
+  const [fx, fz, turn] = FRAMES[key];
+  const dx = x - fx;
+  const dz = z - fz;
+  return [dx * Math.cos(turn) - dz * Math.sin(turn), dx * Math.sin(turn) + dz * Math.cos(turn)];
+}
+
+test('every spot starts at its first stand, at the end of its leg', () => {
+  for (const [key, spot] of Object.entries(SPOTS)) {
+    assert.ok(spot.stands.length >= 1, key);
+    assert.deepEqual(spot.stands[0].at, spotPoint(key), key);
+    for (const s of spot.stands) assert.ok(Number.isFinite(s.yaw) && typeof s.act === 'string', key);
+  }
+});
+
+test('moving between stands never walks into the console, the dais rim, the bench or the board', () => {
+  const BODY = 0.5; // about half the character's width
+  for (const [key, spot] of Object.entries(SPOTS)) {
+    for (const a of spot.stands) {
+      for (const b of spot.stands) {
+        for (const p of [a.at, ...sample(a.at, [b.at])]) {
+          const r = Math.hypot(p[0], p[1]);
+          const where = `${key}: (${p[0].toFixed(2)}, ${p[1].toFixed(2)})`;
+          // desk: inside the ring console (inner radius 1.2); elsewhere: feet off the dais (r 2.64)
+          if (key === 'desk') assert.ok(r <= 1.2 - BODY, where);
+          else assert.ok(r >= 2.64 + 0.2, where);
+          // on the platforms (main: chamfered 9.6 square)
+          if (key !== 'arcade') assert.ok(Math.abs(p[0]) + Math.abs(p[1]) <= 7.8 - BODY && Math.abs(p[0]) <= 4.8 - BODY && Math.abs(p[1]) <= 4.8 - BODY, where);
+          // in front of the editor's bench (front edge at local z 0.4) and the board's base
+          if (key === 'editor') assert.ok(toFrame('editor', p)[1] >= 0.4 + BODY - 0.05, where);
+          if (key === 'board') assert.ok(toFrame('board', p)[1] >= 1.5, where);
+        }
+      }
+    }
+  }
+});
+
+test('stand choice: away from the main stand and back, never the same one twice', () => {
+  const rand = (() => { let a = 7; return () => ((a = (a * 16807) % 2147483647) / 2147483647); })();
+  assert.equal(nextStand(1, 0, rand), 0);
+  for (let i = 0; i < 300; i++) {
+    const count = 2 + (i % 4);
+    const from = i % count;
+    const to = nextStand(count, from, rand);
+    assert.ok(to >= 0 && to < count && to !== from, `${from} -> ${to} of ${count}`);
+    assert.ok(dwell('type', to, rand) > 1 && dwell('stand', to, rand) > 1);
+  }
+});
+
+test('animations and gestures per pose', () => {
+  assert.ok(roams('type') && roams('code') && roams('present') && roams('stand'));
+  assert.ok(!roams('wave') && !roams('slump') && !roams('play'));
+  assert.equal(animFor('type', 'keys'), 'type');
+  assert.equal(animFor('type', 'panel'), 'swipe');
+  assert.equal(animFor('code', 'duck'), 'duck');
+  assert.equal(animFor('present', 'study'), 'study');
+  assert.equal(animFor('stand', 'panel'), 'stand');
+  assert.equal(animFor('wave', 'keys'), 'wave');
+  const rand = () => 0.99;
+  for (const anim of ['walk', 'wave', 'slump', 'present', 'swipe', 'duck']) assert.equal(pickFidget(anim, rand), null, anim);
+  for (const anim of ['stand', 'type', 'code', 'think', 'study', 'play']) {
+    for (const r of [0, 0.5, 0.99]) assert.ok(GESTURE_S[pickFidget(anim, () => r)] > 0, anim);
+    assert.ok(fidgetGap(anim, rand) > 2);
+  }
+  for (const name of ['flinch', 'ready', 'cheer']) assert.ok(GESTURE_S[name] > 0, name);
+  assert.equal(envelope(0), 0);
+  assert.equal(envelope(1), 0);
+  assert.equal(envelope(0.5), 1);
+  for (let k = 0; k <= 1; k += 0.05) assert.ok(envelope(k) >= 0 && envelope(k) <= 1);
 });
 
 // ---- Director ----
@@ -80,7 +155,7 @@ test('character: no session or ended -> hidden at the desk', () => {
 
 test('character goes to the station of the main agent call', () => {
   const d = createDirector();
-  assert.deepEqual(d.character(focusOf({ activity: act('edit') }), NOW), { spot: 'smelter', pose: 'forge', visible: true });
+  assert.deepEqual(d.character(focusOf({ activity: act('edit') }), NOW), { spot: 'editor', pose: 'code', visible: true });
   assert.equal(d.character(focusOf({ activity: act('read') }), NOW).spot, 'board');
   assert.equal(d.character(focusOf({ activity: act('search') }), NOW).spot, 'board');
   assert.deepEqual(d.character(focusOf({ activity: act('shell') }), NOW), { spot: 'desk', pose: 'type', visible: true });
@@ -104,15 +179,15 @@ test('character lingers at a work station between calls, then returns to the des
 test('a call shorter than one frame still moves the character (live events)', () => {
   const d = createDirector();
   d.note({ event: 'PreToolUse', kind: 'edit', tool: 'Edit', target: 'a.js' }, NOW);
-  assert.equal(d.character(focusOf(), NOW + 50).spot, 'smelter'); // the snapshot already shows no call
-  assert.ok(d.stations(focusOf(), NOW + 50).has('smelter'));
-  assert.ok(!d.stations(focusOf(), NOW + HOLD_MS + 1).has('smelter'));
+  assert.equal(d.character(focusOf(), NOW + 50).spot, 'editor'); // the snapshot already shows no call
+  assert.ok(d.stations(focusOf(), NOW + 50).has('editor'));
+  assert.ok(!d.stations(focusOf(), NOW + HOLD_MS + 1).has('editor'));
 });
 
 test('character: waiting waves, error slumps, idle plays only after a finished turn', () => {
   const d = createDirector();
   assert.deepEqual(d.character(focusOf({ status: 'waiting', activity: act('edit') }), NOW),
-    { spot: 'smelter', pose: 'wave', visible: true, faceCamera: true });
+    { spot: 'editor', pose: 'wave', visible: true, faceCamera: true });
   assert.equal(d.character(focusOf({ status: 'waiting' }), NOW).spot, 'desk');
   assert.deepEqual(d.character(focusOf({ status: 'error' }), NOW), { spot: 'desk', pose: 'slump', visible: true });
   assert.deepEqual(d.character(focusOf({ status: 'idle', turnEnded: true }), NOW), { spot: 'arcade', pose: 'play', visible: true });

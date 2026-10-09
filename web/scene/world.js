@@ -190,7 +190,7 @@ function addLights(scene) {
   const lights = {};
   for (const [key, x, y, z, color, intensity, range] of [
     ['desk', 1.3, 3.2, 1.3, LAMP, 9, 10], // the desk lamp, in front of the character
-    ['smelter', -2.5, 1.8, 2.9, P.fireOrange, 14, 8],
+    ['editor', -1.9, 3.0, 2.6, P.fireOrange, 9, 7],
     ['board', 0.3, 2.8, -2.6, P.neonBlue, 12, 9],
     ['centrifuge', 7.9, 1.0, 1.2, P.neonMagenta, 12, 9],
     ['racks', -6.2, 2.6, 0.6, P.neonPurple, 10, 9], // racks + arcade

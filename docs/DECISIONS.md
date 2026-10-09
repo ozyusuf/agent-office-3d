@@ -323,3 +323,77 @@ darken, rain falls, and a soft lightning flash comes every 3-8 s (exposure x1.8 
 white frame). With `prefers-reduced-motion: reduce` the scene keeps still where it can: the clouds
 do not drift, stars do not twinkle, there are no shooting stars, lightning or level-up sparks (the
 ring of light stays). Closes the stage 3/4 known issue about reduced motion in the 3D scene.
+
+## 2026-10-09 - Stage 6
+
+**D58. The installer never changes the user's settings without a diff, a "y" and a backup; the
+settings work is done in Node.** `install.ps1` checks Node.js, runs `npm install`, offers shortcuts
+and starts the server; the settings file is handled by `scripts/setup.js` with the pure, tested
+`scripts/hooks-config.js`, because Windows PowerShell 5.1's `ConvertTo-Json` reformats and escapes
+the file (and silently truncates below `-Depth`), while Node keeps keys, order and values. The
+file's indent, line ends, final newline and BOM are kept. The user-level hook is the project's exec
+form (D2) with the script's absolute path (`${CLAUDE_PROJECT_DIR}` would point at whatever project
+is open): one group without a matcher is appended per event, other hooks are not touched, an exact
+handler of ours stays where it is (re-running changes nothing), and a handler that runs a
+`...\hooks\send-event.ps1` that no longer exists (a moved clone) is replaced. File:
+`%CLAUDE_CONFIG_DIR%\settings.json` when that is set (settings docs), else `~/.claude/settings.json`.
+Invalid JSON stops the installer with nothing changed. Before every write (install and uninstall)
+a copy is saved next to the file (`settings.json.agent-office-3d-<date>.bak`); writes are atomic.
+`data/install.json` remembers the first backup and a hash of what was written. Uninstall: if the
+file is still exactly what the installer wrote, the pre-install copy comes back byte for byte (or
+the file is deleted when the installer created it); otherwise only our handlers are removed, so
+changes made since (e.g. through `/config`) survive. Refines PLAN's "uninstall restores the backup".
+
+**D59. The server drops duplicate events.** In this repo both the project hook
+(`.claude/settings.json`) and the installed user hook run. The hooks docs say a handler defined in
+more than one settings file runs once, but not how handlers are compared, and ours differ in the
+path. This could not be checked live in the session, so the server defends itself
+(`server/dedupe.js`): a body identical to one fired (`X-Hook-Ts`) within 2 s is dropped (arrival
+time when there is no fire time). Real repeats are seconds apart and tool events carry unique
+`tool_use_id`s. Checked by running the installed hook command twice in parallel with one input:
+1 event, 1 duplicate. `/health` reports `duplicates`.
+
+**D60. Start without a window, stop gracefully, shortcuts optional.** `scripts/start.ps1` starts the
+server through a hidden `cmd /c` (a console of its own, so closing the terminal that ran the script
+does not stop it; output goes to `data/server.log`), waits for `/health`, then opens the page in an
+Edge `--app` window (narrow, no tabs; without Edge the default browser). `scripts/stop.ps1` calls the
+new `POST /shutdown`, guarded like `/event` (our header, no Origin, Host check), so the XP file is
+saved before the exit (killing the process would skip that). Shortcuts (`.lnk`, icon
+`scripts/icon.ico` rendered from the favicon): desktop = start and open; Startup folder = start with
+`-NoBrowser` at log-in. Both are asked for, and the uninstaller removes only shortcuts that point at
+this clone's `start.ps1`. Started from a shortcut there is no console, so problems show in a message
+box.
+
+**D61. Windows-only for now, documented.** The hook and the installer are PowerShell. A macOS/Linux
+hook (sh + curl) could not be tested here, so the README describes what a port needs instead of
+shipping untested code (PLAN: "or document Windows-only").
+
+**D62. README screenshots show real work.** They were taken from the user's own running monitor
+while stage 6 was being written (a headless Edge tab; `?lang=en&hour=` only changes the language and
+the sky of that tab), not from scripted events. Frames whose Hook Flow showed local paths were not
+used. States that need events this session did not produce (permission, storm, helpers) are not
+pictured rather than staged.
+
+## 2026-10-09 - Stage 6 follow-up (user)
+
+**D63. The Code Smelter becomes the Code Editor (replaces D34's "Kod Ocağı").** The user: the
+furnace did not make anyone think of code. The Edit station (same place, same key colour orange,
+key `editor`, tr "Kod Editörü") is now a workbench with a monitor showing an editor window that
+writes line by line while Edit / Write / NotebookEdit run (bars only, no text: a fake file would be
+made-up data), a `</>` sign over it, a `</>` emblem on the bench's front, a keyboard and a rubber
+duck (rubber duck debugging). The sign floats where the character's nameplate sits while it types,
+so the emblem on the front keeps the symbol in view. The bench is turned 20° towards the desk and the
+monitor stands left of the keyboard, so the character (seen half from behind) hides little of it;
+only the short visit to the duck puts it in front of the screen.
+Flames, sparks and the hammer are gone; code bits (`{ }`, `( )`, `;`) float up instead.
+
+**D64. The character never just stands: events decide where it is, `life.js` how it spends the time
+there.** The user: it mostly stood still in the middle of a station. At every spot it now moves
+between 1-5 stands (keyboard, holo panels, laptop, a thinking spot; the editor's keyboard, a step
+back, the duck; two places at the board and a step back), mostly returning to the main one, with an
+animation per stand; it breathes, shifts its weight and fidgets (rarely while working), takes small
+steps when it turns on the spot and swings its shoulders when it walks. Real events add reactions: a
+new prompt (fists up, a little jump), a failed main-agent call (flinch), a level up (cheer), and it
+glances at a busy station it does not walk to (Terminal, orbit sphere, portal, racks). Strolls and
+fidgets carry no data and say nothing the HUD does not; the spot, the station lights and the
+reactions still come only from events. Reduced motion turns strolls, fidgets and reactions off.

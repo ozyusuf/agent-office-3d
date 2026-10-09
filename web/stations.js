@@ -6,7 +6,7 @@
 
 export const STATIONS = [
   { key: 'desk', label: 'never' },
-  { key: 'smelter', label: 'always', slot: [0.24, 0.52] },
+  { key: 'editor', label: 'always', slot: [0.24, 0.52] },
   { key: 'board', label: 'always', slot: [0.7, 0.36] },
   { key: 'centrifuge', label: 'always', slot: [0.76, 0.76] },
   { key: 'orbit', label: 'active' },
@@ -18,7 +18,7 @@ export const STATIONS = [
 
 const BY_KIND = {
   read: 'board', search: 'board', task: 'board',
-  edit: 'smelter',
+  edit: 'editor',
   shell: 'centrifuge',
   web: 'orbit',
   agent: 'portal',

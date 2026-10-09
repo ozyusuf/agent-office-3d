@@ -14,7 +14,7 @@ export const HOLD_MS = 700;
 export const RATE_WINDOW_MS = 60_000;
 
 // Stations the character walks to, and its pose there. Every other tool is worked from the desk.
-const WALK_TO = { smelter: 'forge', board: 'present' };
+const WALK_TO = { editor: 'code', board: 'present' };
 const BOARD_KINDS = new Set(['read', 'search', 'task']);
 
 export function createDirector() {
