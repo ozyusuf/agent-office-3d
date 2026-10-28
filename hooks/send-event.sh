@@ -33,9 +33,10 @@ case $port in
 esac
 
 # curl reads the hook JSON from stdin as raw bytes and sends it unchanged. It sends no Origin header,
-# which the server requires for /event (D6). A refused localhost connection fails at once on Linux and
-# macOS; the short timeouts only guard against a server that hangs.
-curl --silent --output /dev/null --max-time 2 --connect-timeout 0.3 \
+# which the server requires for /event (D6). --noproxy: the event never goes to a proxy set in
+# http_proxy, only to this machine. A refused localhost connection fails at once on Linux and macOS;
+# the short timeouts only guard against a server that hangs.
+curl --silent --noproxy '*' --output /dev/null --max-time 2 --connect-timeout 0.3 \
   -X POST "http://127.0.0.1:$port/event" \
   -H 'Content-Type: application/json; charset=utf-8' \
   -H 'X-Agent-Office: 1' \

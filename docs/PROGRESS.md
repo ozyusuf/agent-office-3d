@@ -1,6 +1,8 @@
 # Progress
 
 ## Current state
+- **Linux and macOS support merged** (PR #1 by an outside contributor, 2026-10-28, D70): sh + curl
+  hook, `install.sh` / `uninstall.sh`, `scripts/start.sh` / `stop.sh`. In CHANGELOG "Unreleased".
 - **Stage 8 (glance status) done, v0.3.0** (2026-10-09, D68): green / yellow / red window frame,
   `?` `!` `✓` `✕` bubble over the nameplate, header chip "Done · 4m 05s", questions and plan
   approvals count as waiting. The user checked it live on the tablet: works.
@@ -13,6 +15,30 @@
   in `data/stats.json` (gitignored).
 
 ## Session log (newest first)
+
+### 2026-10-28 - Session 10 - PR #1 (Linux and macOS support, outside contributor) reviewed and merged
+**Done**
+- Reviewed the whole diff (sh hook, `install.sh` / `uninstall.sh`, `scripts/start.sh` / `stop.sh` /
+  `common.sh`, `hooks-config.js`, `setup.js`, tests, docs, D70). Nothing harmful: only 127.0.0.1,
+  no new packages, settings still diff + "y" + backup; Windows paths behave as before.
+- The user chose: merge (merge commit), then fix here. Fixed (D70 follow-up): empty port in
+  `common.sh` under `set -u`, `curl --noproxy '*'` everywhere, `.gitattributes` (`*.sh` LF), CLAUDE.md
+  back to 60 lines. New tests: proxy is never used, script port order with `set -u`.
+- Checks (Git Bash on Windows, scratch servers only): all 7 sh tests pass with the Windows skip
+  removed; the 2 new ones fail on the merged code before the fix (empty port, event went to the
+  proxy). `start.sh` / `stop.sh` end to end with a scratch config on port 7871 and
+  `AGENT_OFFICE_PORT` unset: start, "already running", hook event arrives, stop, "not running".
+  `npm test`: 106 pass, 6 skipped (sh tests on Windows).
+
+**Left:** a run on a real Linux or Mac (only Git Bash on Windows was used).
+
+**Known issues / open questions**
+- `start.sh` treats a Windows-style `AGENT_OFFICE_DATA` (`C:/...`) as relative (Git Bash only; on
+  Linux / macOS absolute paths start with `/`).
+- macOS `date` has no milliseconds: the hook sends whole seconds as `X-Hook-Ts` (D70).
+
+**Next step:** if a Linux / macOS user reports back, adjust; otherwise a release (version bump,
+CHANGELOG "Unreleased" -> version).
 
 ### 2026-10-09 - Session 9 - Stage 8 (glance status) + update docs
 **Done**

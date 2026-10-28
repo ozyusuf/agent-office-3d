@@ -96,3 +96,43 @@ test('sh hook: a bad port is ignored quietly', { skip }, async () => {
   assert.equal(r.code, 0);
   assert.equal(r.out, '');
 });
+
+test('sh hook: never sends the event to a proxy from http_proxy', { skip }, async () => {
+  const target = await scratchServer();
+  const proxy = await scratchServer();
+  try {
+    const proxyUrl = `http://127.0.0.1:${proxy.port}`;
+    const r = await runHook('{"hook_event_name":"Stop"}', {
+      AGENT_OFFICE_PORT: String(target.port), http_proxy: proxyUrl, HTTP_PROXY: proxyUrl, no_proxy: '', NO_PROXY: '',
+    });
+    assert.equal(r.code, 0);
+    assert.equal(target.got.length, 1);
+    assert.equal(proxy.got.length, 0);
+  } finally {
+    target.server.close();
+    proxy.server.close();
+  }
+});
+
+// scripts/common.sh is sourced by install.sh, start.sh, stop.sh and uninstall.sh, which run with set -u.
+function scriptPort(env) {
+  const { AGENT_OFFICE_PORT, ...rest } = process.env;
+  const r = spawnSync('sh', ['-c', 'set -u; . "$1"; printf %s "$PORT"', 'sh', path.join(ROOT, 'scripts', 'common.sh')], {
+    cwd: ROOT, env: { ...rest, ...env }, encoding: 'utf8',
+  });
+  return { port: r.stdout, err: r.stderr };
+}
+
+test('scripts: port from env, else config.json, else 7847, also with set -u', { skip }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ao3d-port-'));
+  try {
+    const config = path.join(dir, 'config.json');
+    fs.writeFileSync(config, '{\n  "port": 7999\n}\n');
+    assert.deepEqual(scriptPort({ AGENT_OFFICE_CONFIG: config }), { port: '7999', err: '' });
+    assert.deepEqual(scriptPort({ AGENT_OFFICE_CONFIG: path.join(dir, 'none.json') }), { port: '7847', err: '' });
+    assert.deepEqual(scriptPort({ AGENT_OFFICE_CONFIG: config, AGENT_OFFICE_PORT: '8123' }), { port: '8123', err: '' });
+    assert.deepEqual(scriptPort({ AGENT_OFFICE_CONFIG: config, AGENT_OFFICE_PORT: 'x' }), { port: '7999', err: '' });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

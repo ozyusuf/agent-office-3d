@@ -5,12 +5,13 @@
 ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 [ -f "$ROOT/package.json" ] || ROOT=$(dirname -- "$ROOT")
 
-# Port: env AGENT_OFFICE_PORT, else "port" in config.json, else 7847 (same order as the server).
+# Port: env AGENT_OFFICE_PORT, else "port" in config.json, else 7847 (same order as the server,
+# which also skips a non-numeric env value). ${...:-} because the scripts run with set -u.
 agent_office_port() {
-  if [ -n "$AGENT_OFFICE_PORT" ]; then
-    printf '%s\n' "$AGENT_OFFICE_PORT"
-    return
-  fi
+  case ${AGENT_OFFICE_PORT:-} in
+    '' | *[!0-9]*) ;;
+    *) printf '%s\n' "$AGENT_OFFICE_PORT"; return ;;
+  esac
   config="${AGENT_OFFICE_CONFIG:-$ROOT/config.json}"
   found=''
   if [ -f "$config" ]; then
@@ -21,9 +22,9 @@ agent_office_port() {
 PORT=$(agent_office_port)
 URL="http://127.0.0.1:$PORT"
 
-# True when an agent-office-3d server answers on PORT.
+# True when an agent-office-3d server answers on PORT. --noproxy: never ask a proxy from http_proxy.
 agent_office_running() {
-  curl --silent --max-time 1 "$URL/health" 2>/dev/null | grep -q '"ok":true'
+  curl --silent --noproxy '*' --max-time 1 "$URL/health" 2>/dev/null | grep -q '"ok":true'
 }
 
 say() { printf '%s\n' "$*"; }

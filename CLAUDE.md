@@ -7,8 +7,7 @@ narrow portrait browser window next to VS Code. Open source; a "how it was built
 
 ## Architecture
 Claude Code hooks -> local server (127.0.0.1 only) -> WebSocket -> three.js page.
-- `hooks/send-event.ps1` - PowerShell hook script. Forwards the raw hook JSON (stdin) to `POST /event`.
-  `hooks/send-event.sh` - the same for Linux and macOS (`sh` + `curl`, D70).
+- `hooks/send-event.ps1` (PowerShell) and `.sh` (Linux/macOS, `curl`, D70) forward the raw hook JSON (stdin) to `POST /event`.
 - `server/index.js` - Node HTTP + `ws`: `POST /event` (drop duplicates `dedupe.js`, reorder by hook start
   time, history, broadcast event + state), `POST /config` (settings panel), `POST /shutdown` (stop.ps1),
   `GET /state`, `GET /health`, serves `web/` + three.js at `/vendor/three/`.
@@ -16,17 +15,14 @@ Claude Code hooks -> local server (127.0.0.1 only) -> WebSocket -> three.js page
   machine + level curve. `server/transcript.js` - context tokens from the transcript. `config.js`, `stats.js`.
 - `web/` - plain ES modules, no build step: HUD `index.html` + `app.js`, `hud.css`, `theme.css`, `i18n.js`,
   `narrate.js`, `stations.js`, `labels.js`, `palette.js`, `settings.js`, `context.js`; `debug.html` raw events.
-  3D scene in `web/scene/`: `realm.js` (renderer, camera, bloom, loop, state -> `drive`), `director.js`
-  + `walk.js` + `life.js` + `daylight.js` (pure, tested), `world.js`, `sky.js`, `props.js`, `character.js`, `helpers.js`,
-  `effects.js`, `kit.js`.
-- Install (Windows, D58-D60): `install.ps1` / `uninstall.ps1` -> `scripts/setup.js` + pure `hooks-config.js`
-  (user settings: diff, "y", backup); `scripts/start.ps1`, `stop.ps1`, `shortcut.ps1`, `common.ps1`.
-  Linux / macOS (D70): `install.sh` / `uninstall.sh` -> the same `setup.js`; `scripts/start.sh`, `stop.sh`, `common.sh`.
+  3D scene in `web/scene/`: `realm.js` (renderer, camera, bloom, loop, state -> `drive`), `director.js` + `walk.js`
+  + `life.js` + `daylight.js` (pure, tested), `world.js`, `sky.js`, `props.js`, `character.js`, `helpers.js`, `effects.js`, `kit.js`.
+- Install (Windows D58-D60, Linux / macOS D70): `install` / `uninstall` (.ps1, .sh) -> `scripts/setup.js` + pure
+  `hooks-config.js` (user settings: diff, "y", backup); `scripts/start`, `stop`, `common` (.ps1, .sh), `shortcut.ps1`.
 - Local files (gitignored): `config.json` (see `config.example.json`), `data/` (stats.json = XP, install.json).
 
 ## Hard rules
-- Hooks are `type: "command"` with `"async": true`, run by Windows PowerShell 5.1 (`powershell.exe`) on
-  Windows and by `sh` (exec form, `curl` inside) on Linux and macOS (D70).
+- Hooks: `type: "command"`, `"async": true`, exec form; Windows PowerShell 5.1 (`powershell.exe`), Linux/macOS `sh` + `curl` (D70).
 - The hook script never writes to stdout, exits silently if the server is down, never blocks or delays Claude.
 - No `prompt` or `agent` hooks. No model calls anywhere.
 - Hooked events: SessionStart, SessionEnd, UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure,

@@ -504,3 +504,10 @@ event's stdin to `/event` with `X-Agent-Office: 1`, never prints anything and al
   (bytes unchanged incl. UTF-8, headers, no Origin, no stdout, port from `config.json`, quick silent
   exit when nothing listens); `test/setup.test.js` covers the POSIX handler and paths. They skip on
   Windows or without `sh` / `curl`.
+- *Fixed after the merge (maintainer review, 2026-10-28):* `scripts/common.sh` read
+  `$AGENT_OFFICE_PORT` under `set -u`, so with the variable unset (the normal case) the port came
+  out empty: `start.sh` reported that the server did not start, `stop.sh` and `uninstall.sh` never
+  stopped it. Now `${AGENT_OFFICE_PORT:-}`; a non-numeric value falls back to `config.json`, like
+  the server. Every `curl` call has `--noproxy '*'`: with `http_proxy` set, curl sent the event
+  (prompts, tool output) to the proxy instead of 127.0.0.1 (seen with Git for Windows' curl).
+  `.gitattributes` keeps `*.sh` at LF in Windows checkouts. Both fixes have a test.

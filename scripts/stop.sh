@@ -9,7 +9,7 @@ if ! agent_office_running; then
   say "agent-office-3d is not running on port $PORT."
   exit 0
 fi
-curl --silent --output /dev/null --max-time 2 -X POST -H 'X-Agent-Office: 1' "$URL/shutdown"
+curl --silent --noproxy '*' --output /dev/null --max-time 2 -X POST -H 'X-Agent-Office: 1' "$URL/shutdown"
 tries=0
 while agent_office_running; do
   tries=$((tries + 1))
