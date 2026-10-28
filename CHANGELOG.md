@@ -4,6 +4,19 @@ What changed in each version of agent-office-3d, newest first. How to update: se
 [Update](README.md#update) in the README. The version you are running is shown at
 http://127.0.0.1:7847/health.
 
+## Unreleased
+
+**Linux and macOS.** agent-office-3d now installs and runs there too.
+
+- New hook `hooks/send-event.sh` (`sh` + `curl`), with the same rules as the Windows one: it never
+  prints anything, never blocks Claude and exits at once when the server is not running.
+- `install.sh` / `uninstall.sh` use the same installer core as Windows: the change to
+  `~/.claude/settings.json` is shown as a diff, written only after a `y`, with a backup first.
+- `scripts/start.sh` / `scripts/stop.sh` start the server in the background and stop it. The README
+  has a systemd unit for starting it on login.
+
+Windows users: nothing changes, the PowerShell hook and installer are the same.
+
 ## 0.3.0 - 2026-10-09
 
 **See from across the room whether Claude needs you.**

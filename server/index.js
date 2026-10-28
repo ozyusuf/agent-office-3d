@@ -206,13 +206,13 @@ function handleConfig(req, res) {
   });
 }
 
-// scripts/stop.ps1 ends a server that runs without a window. Same guard as /event: our header and
+// scripts/stop.ps1 / stop.sh end a server that runs without a window. Same guard as /event: our header and
 // no Origin, so a web page cannot do it (D6). A graceful exit saves the XP file first.
 function handleShutdown(req, res) {
   req.resume();
   if (req.headers['x-agent-office'] !== '1' || req.headers.origin) return sendText(res, 403, 'Forbidden');
   sendText(res, 200, 'Stopping');
-  console.log('Stop requested by scripts/stop.ps1');
+  console.log('Stop requested by scripts/stop.ps1 or stop.sh');
   shutdown();
 }
 

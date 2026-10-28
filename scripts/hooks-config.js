@@ -8,8 +8,13 @@ export const HOOK_EVENTS = [
 ];
 
 // Same exec form as the project settings (D2), with the script's absolute path instead of
-// ${CLAUDE_PROJECT_DIR}, because user settings apply to every project.
+// ${CLAUDE_PROJECT_DIR}, because user settings apply to every project. The script decides the
+// runner: send-event.ps1 runs in Windows PowerShell, send-event.sh in sh on Linux and macOS (D70).
+// Exec form (`args`) spawns `sh` directly, so the script needs no execute bit (ZIP downloads lose it).
 export function hookHandler(scriptPath) {
+  if (/\.sh$/i.test(scriptPath)) {
+    return { type: 'command', command: 'sh', args: [scriptPath], async: true };
+  }
   return {
     type: 'command',
     command: 'powershell.exe',
@@ -18,8 +23,16 @@ export function hookHandler(scriptPath) {
   };
 }
 
-const SCRIPT_TAIL = '\\hooks\\send-event.ps1';
+// The hook script for this platform, as a path relative to the project folder.
+export function hookScriptName(platform = process.platform) {
+  return platform === 'win32' ? 'send-event.ps1' : 'send-event.sh';
+}
+
+const SCRIPT_TAILS = ['\\hooks\\send-event.ps1', '\\hooks\\send-event.sh'];
 const norm = (p) => p.replace(/\//g, '\\').toLowerCase();
+const isScript = (p) => SCRIPT_TAILS.some((tail) => p.endsWith(tail));
+// An absolute path: a Windows drive (c:\...) or, after norm(), a POSIX root (/home/... -> \home\...).
+const isAbsolute = (p) => /^[a-z]:\\/.test(p) || /^\\[^\\]/.test(p);
 
 function handlerPaths(handler) {
   if (!handler || typeof handler !== 'object') return [];
@@ -39,7 +52,7 @@ export function isOurs(handler, scriptPath) {
 export function isStale(handler, exists) {
   return handlerPaths(handler).some((part) => {
     const p = norm(part);
-    return p.endsWith(SCRIPT_TAIL) && /^[a-z]:\\/.test(p) && !exists(part);
+    return isScript(p) && isAbsolute(p) && !exists(part);
   });
 }
 
@@ -127,7 +140,7 @@ export function otherCopies(settings, scriptPath) {
     for (const group of groups) {
       for (const h of group?.hooks ?? []) {
         if (isOurs(h, scriptPath)) continue;
-        for (const part of handlerPaths(h)) if (norm(part).endsWith(SCRIPT_TAIL)) found.add(part);
+        for (const part of handlerPaths(h)) if (isScript(norm(part))) found.add(part);
       }
     }
   }

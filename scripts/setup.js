@@ -4,8 +4,9 @@
 //   node scripts/setup.js uninstall [--yes] [--settings <file>]
 //   node scripts/setup.js status    [--settings <file>]
 //
-// install.ps1 / uninstall.ps1 call this. Rules (CLAUDE.md, D58): show the exact change as a diff,
-// change nothing without a "y", back the file up before every write, keep every other setting.
+// install.ps1 / uninstall.ps1 (Windows) and install.sh / uninstall.sh (Linux, macOS, D70) call this.
+// Rules (CLAUDE.md, D58): show the exact change as a diff, change nothing without a "y", back the
+// file up before every write, keep every other setting.
 // --settings points at another file (tests); the default is the user settings file of Claude Code:
 // %CLAUDE_CONFIG_DIR%\settings.json, else ~/.claude/settings.json.
 // Exit codes: 0 done (or nothing to do), 1 error, 2 cancelled by the user.
@@ -16,10 +17,10 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
-import { HOOK_EVENTS, addHooks, removeHooks, otherCopies, detectStyle, formatSettings, lineDiff } from './hooks-config.js';
+import { HOOK_EVENTS, hookScriptName, addHooks, removeHooks, otherCopies, detectStyle, formatSettings, lineDiff } from './hooks-config.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const SCRIPT = path.join(ROOT, 'hooks', 'send-event.ps1');
+const SCRIPT = path.join(ROOT, 'hooks', hookScriptName());
 const DATA_DIR = path.resolve(ROOT, process.env.AGENT_OFFICE_DATA || 'data');
 const STATE_FILE = path.join(DATA_DIR, 'install.json');
 const BOM = '﻿';

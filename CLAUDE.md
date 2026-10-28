@@ -8,6 +8,7 @@ narrow portrait browser window next to VS Code. Open source; a "how it was built
 ## Architecture
 Claude Code hooks -> local server (127.0.0.1 only) -> WebSocket -> three.js page.
 - `hooks/send-event.ps1` - PowerShell hook script. Forwards the raw hook JSON (stdin) to `POST /event`.
+  `hooks/send-event.sh` - the same for Linux and macOS (`sh` + `curl`, D70).
 - `server/index.js` - Node HTTP + `ws`: `POST /event` (drop duplicates `dedupe.js`, reorder by hook start
   time, history, broadcast event + state), `POST /config` (settings panel), `POST /shutdown` (stop.ps1),
   `GET /state`, `GET /health`, serves `web/` + three.js at `/vendor/three/`.
@@ -20,10 +21,12 @@ Claude Code hooks -> local server (127.0.0.1 only) -> WebSocket -> three.js page
   `effects.js`, `kit.js`.
 - Install (Windows, D58-D60): `install.ps1` / `uninstall.ps1` -> `scripts/setup.js` + pure `hooks-config.js`
   (user settings: diff, "y", backup); `scripts/start.ps1`, `stop.ps1`, `shortcut.ps1`, `common.ps1`.
+  Linux / macOS (D70): `install.sh` / `uninstall.sh` -> the same `setup.js`; `scripts/start.sh`, `stop.sh`, `common.sh`.
 - Local files (gitignored): `config.json` (see `config.example.json`), `data/` (stats.json = XP, install.json).
 
 ## Hard rules
-- Hooks are `type: "command"`, run by Windows PowerShell 5.1 (`powershell.exe`) with `"async": true`.
+- Hooks are `type: "command"` with `"async": true`, run by Windows PowerShell 5.1 (`powershell.exe`) on
+  Windows and by `sh` (exec form, `curl` inside) on Linux and macOS (D70).
 - The hook script never writes to stdout, exits silently if the server is down, never blocks or delays Claude.
 - No `prompt` or `agent` hooks. No model calls anywhere.
 - Hooked events: SessionStart, SessionEnd, UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure,
@@ -51,6 +54,7 @@ npm test                 # node:test unit tests
 Scratch test server (never the user's data): set `AGENT_OFFICE_PORT`, `AGENT_OFFICE_CONFIG`, `AGENT_OFFICE_DATA`.
 Never send test events to the server the user watches. Test the hook by hand (PowerShell):
 `'{"hook_event_name":"Stop","session_id":"t"}' | powershell -NoProfile -ExecutionPolicy Bypass -File hooks/send-event.ps1`
+or (sh): `echo '{"hook_event_name":"Stop","session_id":"t"}' | sh hooks/send-event.sh`
 
 ## Docs map
 - `docs/PLAN.md` - stages, tasks, "done when". `docs/DESIGN.md` - palette, screen layout, scene objects, event -> reaction table.

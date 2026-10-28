@@ -6,7 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
-  HOOK_EVENTS, hookHandler, addHooks, removeHooks, otherCopies, detectStyle, formatSettings, lineDiff,
+  HOOK_EVENTS, hookHandler, hookScriptName, addHooks, removeHooks, otherCopies, detectStyle, formatSettings, lineDiff,
 } from '../scripts/hooks-config.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -97,6 +97,33 @@ test('paths match whatever the slashes and letter case', () => {
   assert.equal(removeHooks({ hooks: { Stop: [{ hooks: [handler] }] } }, SCRIPT).removed, 1);
 });
 
+test('a .sh script runs in sh with exec form (Linux, macOS)', () => {
+  assert.deepEqual(hookHandler('/home/me/agent-office-3d/hooks/send-event.sh'), {
+    type: 'command', command: 'sh', args: ['/home/me/agent-office-3d/hooks/send-event.sh'], async: true,
+  });
+  assert.equal(hookScriptName('win32'), 'send-event.ps1');
+  assert.equal(hookScriptName('linux'), 'send-event.sh');
+  assert.equal(hookScriptName('darwin'), 'send-event.sh');
+});
+
+test('POSIX paths: install, re-install, stale clone, other clone, uninstall', () => {
+  const posix = '/home/me/agent-office-3d/hooks/send-event.sh';
+  const { settings, added } = addHooks(userSettings(), posix);
+  assert.equal(added, 13);
+  assert.equal(addHooks(settings, posix).kept, 13);
+  assert.deepEqual(removeHooks(settings, posix).settings, userSettings());
+
+  const old = '/opt/old/agent-office-3d/hooks/send-event.sh';
+  const other = '/srv/second/agent-office-3d/hooks/send-event.sh';
+  const start = { hooks: { Stop: [{ hooks: [hookHandler(old)] }, { hooks: [hookHandler(other)] }] } };
+  const result = addHooks(start, posix, { exists: (p) => p !== old });
+  assert.equal(result.stale, 1);
+  assert.deepEqual(otherCopies(result.settings, posix), [other]);
+  // A relative project path is never stale: it cannot be checked from here.
+  const project = { hooks: { Stop: [{ hooks: [hookHandler('${CLAUDE_PROJECT_DIR}/hooks/send-event.sh')] }] } };
+  assert.equal(addHooks(project, posix, { exists: () => false }).stale, 0);
+});
+
 test('a file that is not a settings object is refused', () => {
   assert.throws(() => addHooks([], SCRIPT), /JSON object/);
   assert.throws(() => addHooks({ hooks: [] }, SCRIPT), /"hooks" is not an object/);
@@ -164,6 +191,10 @@ test('cli: install, re-install, uninstall restores the original bytes', () => {
   assert.equal(JSON.parse(written).env.A, 'ü');
   assert.equal(backups(s).length, 1);
   assert.equal(fs.readFileSync(path.join(path.dirname(s.settings), backups(s)[0]), 'utf8'), original);
+
+  const handler = JSON.parse(written).hooks.Stop[0].hooks[0];
+  assert.ok(handler.args.at(-1).endsWith(hookScriptName()), handler.args.at(-1));
+  assert.ok(fs.existsSync(handler.args.at(-1)), 'the hook script the installer points at exists');
 
   const again = run(s, 'install', '--yes');
   assert.equal(again.code, 0);

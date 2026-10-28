@@ -35,7 +35,8 @@ grows with every finished tool call. Every number on screen comes from a real Cl
 
 ## Requirements
 
-- Windows 10 or 11 (the hook uses Windows PowerShell 5.1, which comes with Windows)
+- Windows 10 or 11 (the hook uses Windows PowerShell 5.1, which comes with Windows), or Linux or
+  macOS with `curl` (see [Linux and macOS](#linux-and-macos))
 - [Node.js](https://nodejs.org) 20 or newer (the LTS version is fine)
 - [Claude Code](https://code.claude.com) (CLI, VS Code extension or desktop app)
 - [Git](https://git-scm.com) to download the project (or "Download ZIP" on GitHub and unpack it)
@@ -130,7 +131,7 @@ view shows. Your level (XP) is stored in `data/stats.json`.
 ## Troubleshooting
 
 - **No events on screen.** Is the server running (http://127.0.0.1:7847/health)? Run
-  `node scripts\setup.js status` to see whether the hook is in your settings. Hook changes reach
+  `node scripts/setup.js status` to see whether the hook is in your settings. Hook changes reach
   running Claude Code sessions by themselves; if one does not react, restart it. If your settings
   contain `"disableAllHooks": true`, no hook runs.
 - **"Waiting for permission" stays on after you deny a request.** Claude Code fires no hook when a
@@ -145,13 +146,48 @@ view shows. Your level (XP) is stored in `data/stats.json`.
 - **The installer stops because the settings file is not valid JSON.** Fix the file (or restore
   one of its backups) and run the installer again; nothing was changed.
 
-## Other platforms
+## Linux and macOS
 
-The hook script and the installer are Windows-only for now. The server and the page are plain
-Node.js and would run anywhere; a macOS or Linux port needs a hook that posts the event's stdin to
-`http://127.0.0.1:7847/event` with the header `X-Agent-Office: 1` (and optionally the hook's start
-time in milliseconds as `X-Hook-Ts`), never prints anything and always exits 0, for example with
-`curl`. Contributions are welcome.
+The server and the page are the same on every platform; on Linux and macOS the hook is
+`hooks/send-event.sh`, a few lines of `sh` that post the event with `curl`. Same rules as on Windows:
+it never prints anything, always exits 0 and returns at once when the server is not running.
+
+```sh
+git clone https://github.com/ozyusuf/agent-office-3d.git
+cd agent-office-3d
+sh install.sh
+```
+
+The installer checks Node.js (20 or newer) and `curl`, runs `npm install`, shows the change to
+`~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR/settings.json`) as a diff and writes it only after
+you type `y`, with a backup first, exactly like `install.ps1`. Then it offers to start the server.
+
+- **Start:** `sh scripts/start.sh` starts the server in the background (log in `data/server.log`) and
+  opens the monitor with `xdg-open` / `open`. `--no-browser` only starts it.
+- **Stop:** `sh scripts/stop.sh`.
+- **Uninstall:** `sh uninstall.sh` (shows the change and asks first, like `uninstall.ps1`).
+- **Update:** `sh scripts/stop.sh`, `git pull`, `sh install.sh`.
+- **Start on login (Linux, systemd):** save this as `~/.config/systemd/user/agent-office-3d.service`
+  (put your own path in `WorkingDirectory`, and the full path of `node` in `ExecStart` if it comes
+  from nvm or similar), then run
+  `systemctl --user daemon-reload && systemctl --user enable --now agent-office-3d`:
+
+  ```ini
+  [Unit]
+  Description=agent-office-3d server
+
+  [Service]
+  WorkingDirectory=%h/agent-office-3d
+  ExecStart=/usr/bin/env node server/index.js
+  Restart=on-failure
+
+  [Install]
+  WantedBy=default.target
+  ```
+
+Desktop shortcuts and the narrow Edge app window are Windows-only; on Linux and macOS open
+http://127.0.0.1:7847 in any browser window. Test the hook by hand:
+`echo '{"hook_event_name":"Stop","session_id":"t"}' | sh hooks/send-event.sh`.
 
 ## Development
 

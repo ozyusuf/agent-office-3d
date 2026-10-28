@@ -477,3 +477,30 @@ works in; the extension shows usage only in its `/usage` dialog. Reading the acc
 Anthropic's servers with the stored login would be an unofficial call with the user's credentials
 and is ruled out (privacy, no outside calls). Possible later: forward `rate_limits` from a status
 line for users of the terminal CLI.
+
+## 2026-10-28 - Linux and macOS port (contribution)
+
+**D70. Linux and macOS get a `sh` + `curl` twin of the hook and the installer scripts; the server,
+the page and the installer core stay shared.** The README invited a port ("a hook that posts the
+event's stdin to `/event` with `X-Agent-Office: 1`, never prints anything and always exits 0").
+- *Hook:* `hooks/send-event.sh` keeps D1-D5: raw stdin bytes go unchanged to `POST /event`
+  (`curl --data-binary @-`, which sends no Origin, so D6 holds), stdout and stderr go to
+  `/dev/null`, exit code is always 0, `--connect-timeout 0.3` / `--max-time 2` guard against a
+  hanging server (a refused localhost connection fails at once on Linux and macOS). `X-Hook-Ts` is
+  `date +%s%3N`; BSD date (macOS) has no `%N`, so it falls back to whole seconds there, which only
+  loosens the reorder hint. Port lookup is the same order as the server (env, `config.json`, 7847);
+  a non-numeric port makes the hook exit quietly.
+- *Handler:* exec form `{"command": "sh", "args": ["<abs path>/hooks/send-event.sh"], "async": true}`
+  (hooks docs: with `args`, `command` is spawned directly with no shell). Running it through `sh`
+  means a ZIP download, which drops the execute bit, still works. `hookHandler()` picks the form
+  by the script's extension and `hookScriptName()` picks the script by `process.platform`, so
+  `setup.js` (diff, "y", backup, restore on uninstall, D58-D60) is unchanged for both.
+- *Stale / other clones:* matched for both `\hooks\send-event.ps1` and `\hooks\send-event.sh`;
+  "absolute" now also means a POSIX root (`/...`), so a moved Linux clone is replaced like a moved
+  Windows one. `${CLAUDE_PROJECT_DIR}/...` is still never called stale.
+- *Not ported:* desktop shortcuts, the Edge app window and the login task. The README shows a
+  systemd user unit instead; macOS users can add `scripts/start.sh` to their login items.
+- *Tests:* `test/hook-sh.test.js` runs the real script against a scratch server on a random port
+  (bytes unchanged incl. UTF-8, headers, no Origin, no stdout, port from `config.json`, quick silent
+  exit when nothing listens); `test/setup.test.js` covers the POSIX handler and paths. They skip on
+  Windows or without `sh` / `curl`.
