@@ -25,6 +25,8 @@ else
   fi
   data="${AGENT_OFFICE_DATA:-$ROOT/data}"
   case $data in /*) ;; *) data="$ROOT/$data" ;; esac
+  # The log names commands and files: readable only by this user, also on a shared machine.
+  umask 077
   mkdir -p "$data"
   log="$data/server.log"
   (cd "$ROOT" && nohup node server/index.js >>"$log" 2>&1 &)

@@ -13,8 +13,8 @@ http://127.0.0.1:7847/health.
   talks to 127.0.0.1 directly, also when a proxy is set in `http_proxy`.
 - `install.sh` / `uninstall.sh` use the same installer core as Windows: the change to
   `~/.claude/settings.json` is shown as a diff, written only after a `y`, with a backup first.
-- `scripts/start.sh` / `scripts/stop.sh` start the server in the background and stop it. The README
-  has a systemd unit for starting it on login.
+- `scripts/start.sh` / `scripts/stop.sh` start the server in the background and stop it. The server
+  log (`data/server.log`) is readable only by you. The README has a systemd unit for starting it on login.
 
 Windows users: nothing changes, the PowerShell hook and installer are the same.
 

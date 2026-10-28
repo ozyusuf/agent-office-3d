@@ -510,4 +510,6 @@ event's stdin to `/event` with `X-Agent-Office: 1`, never prints anything and al
   stopped it. Now `${AGENT_OFFICE_PORT:-}`; a non-numeric value falls back to `config.json`, like
   the server. Every `curl` call has `--noproxy '*'`: with `http_proxy` set, curl sent the event
   (prompts, tool output) to the proxy instead of 127.0.0.1 (seen with Git for Windows' curl).
-  `.gitattributes` keeps `*.sh` at LF in Windows checkouts. Both fixes have a test.
+  `.gitattributes` keeps `*.sh` at LF in Windows checkouts. Both fixes have a test. `start.sh`
+  sets `umask 077` before it creates `data/` and the log: the log names commands and files, and on
+  a shared Linux machine other users could read it (Windows profile folders are private already).
